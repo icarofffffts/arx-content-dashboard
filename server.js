@@ -89,6 +89,7 @@ app.get('/api/metrics', async (req, res) => {
         COUNT(*) AS total,
         COUNT(CASE WHEN status = 'rendering' THEN 1 END) AS rendering,
         COUNT(CASE WHEN status = 'scheduled' THEN 1 END) AS scheduled,
+        COUNT(CASE WHEN status = 'paused' THEN 1 END) AS paused,
         COUNT(CASE WHEN status = 'posted_linkedin' THEN 1 END) AS posted_linkedin,
         COUNT(CASE WHEN status = 'posted_instagram' THEN 1 END) AS posted_instagram,
         COUNT(CASE WHEN status = 'published' THEN 1 END) AS published
@@ -111,6 +112,7 @@ app.get('/api/posts', async (req, res) => {
         CASE 
           WHEN status = 'rendering' THEN 25
           WHEN status = 'scheduled' THEN 75
+          WHEN status = 'paused' THEN 50
           ELSE 100
         END AS progress_percentage
       FROM public.content_pipeline
@@ -178,7 +180,32 @@ app.patch('/api/posts/:id/reschedule', async (req, res) => {
   }
 });
 
-// 6. API: Delete Post and Cleanup Media
+// 6. API: Toggle Pause / Resume Post Schedule
+app.patch('/api/posts/:id/toggle-pause', async (req, res) => {
+  try {
+    const postId = req.params.id;
+
+    const currentRes = await pool.query(`SELECT status FROM public.content_pipeline WHERE id = $1;`, [postId]);
+    if (currentRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Post não encontrado.' });
+    }
+
+    const currentStatus = currentRes.rows[0].status;
+    const newStatus = currentStatus === 'paused' ? 'scheduled' : 'paused';
+
+    await pool.query(`
+      UPDATE public.content_pipeline 
+      SET status = $1, updated_at = NOW() 
+      WHERE id = $2;
+    `, [newStatus, postId]);
+
+    res.json({ success: true, status: newStatus, message: newStatus === 'paused' ? 'Post pausado com sucesso!' : 'Agendamento retomado com sucesso!' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 7. API: Delete Post and Cleanup Media
 app.delete('/api/posts/:id', async (req, res) => {
   try {
     const postId = req.params.id;
@@ -205,7 +232,7 @@ app.delete('/api/posts/:id', async (req, res) => {
   }
 });
 
-// 7. API: Get Promotions List & Click Metrics
+// 8. API: Get Promotions List & Click Metrics
 app.get('/api/v1/promos', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -227,7 +254,7 @@ app.get('/api/v1/promos', async (req, res) => {
   }
 });
 
-// 8. API: Broadcast New Promo Offer to Telegram & WhatsApp
+// 9. API: Broadcast New Promo Offer to Telegram & WhatsApp
 app.post('/api/v1/promos/broadcast', async (req, res) => {
   try {
     const { title, original_price, promo_price, store_name, original_url, image_url } = req.body;
@@ -262,7 +289,7 @@ app.post('/api/v1/promos/broadcast', async (req, res) => {
   }
 });
 
-// 9. API: Get Leads List
+// 10. API: Get Leads List
 app.get('/api/v1/leads', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -280,7 +307,7 @@ app.get('/api/v1/leads', async (req, res) => {
   }
 });
 
-// 10. API: Get Lead Statistics
+// 11. API: Get Lead Statistics
 app.get('/api/v1/leads/stats', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -306,7 +333,7 @@ app.get('/api/v1/leads/stats', async (req, res) => {
   }
 });
 
-// 11. API: Webhook for DM Lead Processing
+// 12. API: Webhook for DM Lead Processing
 app.post('/api/v1/leads/dm-webhook', async (req, res) => {
   try {
     const { sender_id, sender_handle, full_name, email, post_id, is_following, message_text } = req.body;
@@ -355,7 +382,7 @@ app.post('/api/v1/leads/dm-webhook', async (req, res) => {
   }
 });
 
-// 12. API: Generate Secure Hashed Short Link
+// 13. API: Generate Secure Hashed Short Link
 app.post('/api/shorten', async (req, res) => {
   try {
     const { original_url, post_id } = req.body;
@@ -378,7 +405,7 @@ app.post('/api/shorten', async (req, res) => {
   }
 });
 
-// 13. API: Get All Hashed Short Links
+// 14. API: Get All Hashed Short Links
 app.get('/api/shortlinks', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -393,7 +420,7 @@ app.get('/api/shortlinks', async (req, res) => {
   }
 });
 
-// 14. Secure Hashed Link Resolver & Click Tracker (`/r/:code`)
+// 15. Secure Hashed Link Resolver & Click Tracker (`/r/:code`)
 app.get('/r/:code', async (req, res) => {
   try {
     const code = req.params.code;
@@ -415,7 +442,7 @@ app.get('/r/:code', async (req, res) => {
   }
 });
 
-// 15. API: Trigger New Custom Content Generation with Schedule Options
+// 16. API: Trigger New Custom Content Generation with Schedule Options
 app.post('/api/generate', async (req, res) => {
   try {
     const { topic, channel, publish_mode, scheduled_at } = req.body;

@@ -65,7 +65,7 @@
         }
         .metrics-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 18px;
             margin-bottom: 36px;
         }
@@ -167,6 +167,7 @@
         }
         .badge-rendering { background: rgba(168, 85, 247, 0.2); color: #C084FC; border: 1px solid rgba(168, 85, 247, 0.4); }
         .badge-scheduled { background: rgba(234, 179, 8, 0.2); color: #FACC15; border: 1px solid rgba(234, 179, 8, 0.4); }
+        .badge-paused { background: rgba(249, 115, 22, 0.2); color: #FB923C; border: 1px solid rgba(249, 115, 22, 0.4); }
         .badge-posted_linkedin { background: rgba(59, 130, 246, 0.2); color: #60A5FA; border: 1px solid rgba(59, 130, 246, 0.4); }
         .badge-posted_instagram { background: rgba(236, 72, 153, 0.2); color: #F472B6; border: 1px solid rgba(236, 72, 153, 0.4); }
         .badge-published { background: rgba(34, 197, 94, 0.2); color: #4ADE80; border: 1px solid rgba(34, 197, 94, 0.4); }
@@ -236,6 +237,10 @@
         .btn-publish-now:hover { transform: scale(1.02); box-shadow: 0 0 24px rgba(16, 185, 129, 0.5); }
         .btn-reschedule { background: linear-gradient(135deg, #8B5CF6, #6D28D9); color: white; }
         .btn-reschedule:hover { background: #5B21B6; }
+        .btn-pause { background: rgba(249, 115, 22, 0.2); color: #FB923C; border: 1px solid rgba(249, 115, 22, 0.4); }
+        .btn-pause:hover { background: rgba(249, 115, 22, 0.4); color: white; }
+        .btn-resume { background: rgba(34, 197, 94, 0.2); color: #4ADE80; border: 1px solid rgba(34, 197, 94, 0.4); }
+        .btn-resume:hover { background: rgba(34, 197, 94, 0.4); color: white; }
         .btn-outline { background: rgba(255,255,255,0.05); color: #E2E8F0; border: 1px solid rgba(255,255,255,0.1); }
         .btn-outline:hover { background: rgba(255,255,255,0.12); }
         .btn-danger { background: rgba(239, 68, 68, 0.2); color: #FCA5A5; border: 1px solid rgba(239, 68, 68, 0.3); }
@@ -334,6 +339,10 @@
                 <div class="metric-value" id="m-scheduled" style="color: #FACC15;">0</div>
             </div>
             <div class="metric-card">
+                <div class="metric-title">⏸️ Pausados em Fila</div>
+                <div class="metric-value" id="m-paused" style="color: #FB923C;">0</div>
+            </div>
+            <div class="metric-card">
                 <div class="metric-title">🎯 Leads Capturados (DM)</div>
                 <div class="metric-value" id="m-leads" style="color: #EC4899;">0</div>
             </div>
@@ -347,6 +356,7 @@
         <div class="nav-tabs">
             <button class="tab-btn active" onclick="switchTab('all')">Todos os Posts</button>
             <button class="tab-btn" onclick="switchTab('scheduled')">⏳ Aguardando Envio</button>
+            <button class="tab-btn" onclick="switchTab('paused')">⏸️ Pausados</button>
             <button class="tab-btn" onclick="switchTab('published')">✅ Publicados</button>
             <button class="tab-btn" onclick="switchTab('leads')">🎯 Leads Capturados por DM (TS Engine)</button>
             <button class="tab-btn" onclick="switchTab('promos')">🔥 Deals Bot (WhatsApp & Telegram)</button>
@@ -570,6 +580,7 @@
                 document.getElementById('m-total').innerText = data.total || 0;
                 document.getElementById('m-rendering').innerText = data.rendering || 0;
                 document.getElementById('m-scheduled').innerText = data.scheduled || 0;
+                document.getElementById('m-paused').innerText = data.paused || 0;
                 document.getElementById('m-published').innerText = data.published || 0;
 
                 const resPromos = await fetchWithAuth('/api/v1/promos');
@@ -602,13 +613,13 @@
                     const createdDate = new Date(p.created_at).toLocaleString('pt-BR');
                     const schedDate = p.scheduled_at ? new Date(p.scheduled_at).toLocaleString('pt-BR') : createdDate;
                     const pct = p.progress_percentage || 25;
-                    const stageText = pct === 25 ? '🧠 Gerando & Fact-Checking' : pct === 75 ? '📅 Agendado & Seguro' : '🚀 Publicado com Sucesso';
+                    const stageText = pct === 25 ? '🧠 Gerando & Fact-Checking' : p.status === 'paused' ? '⏸️ Pausado na Fila' : pct === 75 ? '📅 Agendado & Seguro' : '🚀 Publicado com Sucesso';
 
                     return `
                         <div class="post-card" id="card-${p.id}">
                             <img src="${thumb}" class="post-thumb" alt="Thumbnail Slide" />
                             <div class="post-content">
-                                <span class="badge badge-${p.status}">${p.status}</span>
+                                <span class="badge badge-${p.status}">${p.status === 'paused' ? '⏸️ PAUSADO' : p.status}</span>
                                 <div class="post-title">${p.topic}</div>
                                 
                                 <div class="progress-box">
@@ -617,15 +628,18 @@
                                         <span>${pct}%</span>
                                     </div>
                                     <div class="progress-bar-bg">
-                                        <div class="progress-bar-fill" style="width: ${pct}%;"></div>
+                                        <div class="progress-bar-fill" style="width: ${pct}%; ${p.status === 'paused' ? 'background: linear-gradient(90deg, #F97316, #EAB308);' : ''}"></div>
                                     </div>
                                 </div>
 
                                 <div class="post-date">📅 Agendado para: <strong style="color: #F8FAFC;">${schedDate}</strong></div>
                                 <div class="post-actions">
-                                    ${p.status === 'scheduled' ? `
+                                    ${p.status === 'scheduled' || p.status === 'paused' ? `
                                         <button class="btn btn-publish-now" id="pub-btn-${p.id}" onclick="publishNow('${p.id}')">🚀 Publicar Agora</button>
                                         <button class="btn btn-reschedule" onclick="openRescheduleModal('${p.id}', '${encodeURIComponent(p.topic)}')">📅 Reagendar</button>
+                                        ${p.status === 'scheduled' 
+                                            ? `<button class="btn btn-pause" onclick="togglePausePost('${p.id}')">⏸️ Pausar</button>`
+                                            : `<button class="btn btn-resume" onclick="togglePausePost('${p.id}')">▶️ Retomar</button>`}
                                     ` : ''}
                                     <button class="btn btn-outline" onclick="openPreview('${encodeURIComponent(JSON.stringify(mediaList))}', '${encodeURIComponent(p.topic)}')">🔍 Ver 5 Slides</button>
                                     ${p.pdf_url ? `<a href="${p.pdf_url}" target="_blank" class="btn btn-primary">📄 PDF</a>` : ''}
@@ -639,6 +653,21 @@
                 }).join('');
             } catch(e) {
                 grid.innerHTML = '<div style="color: #EF4444;">Erro ao carregar dados.</div>';
+            }
+        }
+
+        async function togglePausePost(postId) {
+            try {
+                const res = await fetchWithAuth(`/api/posts/${postId}/toggle-pause`, { method: 'PATCH' });
+                const data = await res.json();
+                if (data.success) {
+                    fetchPosts(currentTab);
+                    fetchMetrics();
+                } else {
+                    alert('Erro ao alterar status: ' + (data.error || 'Tente novamente.'));
+                }
+            } catch(e) {
+                alert('Erro ao pausar/retomar post.');
             }
         }
 
