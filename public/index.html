@@ -234,6 +234,8 @@
         .btn-primary:hover { background: #1D4ED8; }
         .btn-publish-now { background: linear-gradient(135deg, #10B981, #059669); color: white; box-shadow: 0 0 16px rgba(16, 185, 129, 0.3); }
         .btn-publish-now:hover { transform: scale(1.02); box-shadow: 0 0 24px rgba(16, 185, 129, 0.5); }
+        .btn-reschedule { background: linear-gradient(135deg, #8B5CF6, #6D28D9); color: white; }
+        .btn-reschedule:hover { background: #5B21B6; }
         .btn-outline { background: rgba(255,255,255,0.05); color: #E2E8F0; border: 1px solid rgba(255,255,255,0.1); }
         .btn-outline:hover { background: rgba(255,255,255,0.12); }
         .btn-danger { background: rgba(239, 68, 68, 0.2); color: #FCA5A5; border: 1px solid rgba(239, 68, 68, 0.3); }
@@ -256,11 +258,9 @@
             background: #0F172A;
             border: 1px solid rgba(255,255,255,0.1);
             border-radius: 24px;
-            max-width: 960px;
+            max-width: 600px;
             width: 100%;
             padding: 32px;
-            max-height: 90vh;
-            overflow-y: auto;
         }
 
         .generator-box {
@@ -312,7 +312,7 @@
             <div class="logo-icon">A</div>
             <div>
                 <div class="logo-text">Arx Content Factory</div>
-                <div class="logo-sub">Painel Master TypeScript & PromoHunter Bot</div>
+                <div class="logo-sub">Painel Master TypeScript & Agendamento Flexível</div>
             </div>
         </div>
         <button class="btn btn-danger" onclick="logout()">🚪 Sair</button>
@@ -499,16 +499,34 @@
     </div>
 
     <!-- Modal Preview -->
-    <div id="modal-preview" class="modal-overlay" onclick="closeModal()">
-        <div class="modal-body" onclick="event.stopPropagation()">
+    <div id="modal-preview" class="modal-overlay" onclick="closeModal('modal-preview')">
+        <div class="modal-body" style="max-width: 960px;" onclick="event.stopPropagation()">
             <h2 id="modal-title" style="margin-bottom: 20px;"></h2>
             <div id="modal-slides" style="display: flex; gap: 16px; overflow-x: auto; padding-bottom: 16px;"></div>
-            <button class="btn btn-outline" onclick="closeModal()" style="margin-top: 20px; margin-left: auto;">Fechar</button>
+            <button class="btn btn-outline" onclick="closeModal('modal-preview')" style="margin-top: 20px; margin-left: auto;">Fechar</button>
+        </div>
+    </div>
+
+    <!-- Modal Reschedule -->
+    <div id="modal-reschedule" class="modal-overlay" onclick="closeModal('modal-reschedule')">
+        <div class="modal-body" onclick="event.stopPropagation()">
+            <h2 style="margin-bottom: 16px; font-size: 22px;">📅 Alterar Data/Hora de Publicação</h2>
+            <p id="reschedule-topic" style="color: #94A3B8; margin-bottom: 20px; font-size: 14px;"></p>
+            <form onsubmit="submitReschedule(event)">
+                <input type="hidden" id="reschedule-post-id">
+                <div class="form-group">
+                    <label class="form-label">Nova Data e Hora Futura</label>
+                    <input type="datetime-local" id="reschedule-date-input" class="form-input" required>
+                </div>
+                <div style="display: flex; gap: 12px; margin-top: 24px;">
+                    <button type="submit" class="btn btn-primary" style="flex: 1; padding: 12px;">✅ Confirmar Novo Agendamento</button>
+                    <button type="button" class="btn btn-outline" onclick="closeModal('modal-reschedule')">Cancelar</button>
+                </div>
+            </form>
         </div>
     </div>
 
     <script>
-        // Check & Process Token from Query string or localStorage
         const urlParams = new URLSearchParams(window.location.search);
         let token = urlParams.get('token');
         if (token) {
@@ -582,6 +600,7 @@
                     const thumb = mediaList[0] || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80';
                     
                     const createdDate = new Date(p.created_at).toLocaleString('pt-BR');
+                    const schedDate = p.scheduled_at ? new Date(p.scheduled_at).toLocaleString('pt-BR') : createdDate;
                     const pct = p.progress_percentage || 25;
                     const stageText = pct === 25 ? '🧠 Gerando & Fact-Checking' : pct === 75 ? '📅 Agendado & Seguro' : '🚀 Publicado com Sucesso';
 
@@ -602,9 +621,12 @@
                                     </div>
                                 </div>
 
-                                <div class="post-date">📅 Criado em: ${createdDate}</div>
+                                <div class="post-date">📅 Agendado para: <strong style="color: #F8FAFC;">${schedDate}</strong></div>
                                 <div class="post-actions">
-                                    ${p.status === 'scheduled' ? `<button class="btn btn-publish-now" id="pub-btn-${p.id}" onclick="publishNow('${p.id}')">🚀 Publicar Agora</button>` : ''}
+                                    ${p.status === 'scheduled' ? `
+                                        <button class="btn btn-publish-now" id="pub-btn-${p.id}" onclick="publishNow('${p.id}')">🚀 Publicar Agora</button>
+                                        <button class="btn btn-reschedule" onclick="openRescheduleModal('${p.id}', '${encodeURIComponent(p.topic)}')">📅 Reagendar</button>
+                                    ` : ''}
                                     <button class="btn btn-outline" onclick="openPreview('${encodeURIComponent(JSON.stringify(mediaList))}', '${encodeURIComponent(p.topic)}')">🔍 Ver 5 Slides</button>
                                     ${p.pdf_url ? `<a href="${p.pdf_url}" target="_blank" class="btn btn-primary">📄 PDF</a>` : ''}
                                     ${p.status === 'posted_linkedin' || p.status === 'published' ? `<a href="https://www.linkedin.com/in/icarosilva-dev" target="_blank" class="btn btn-social">🔗 LinkedIn</a>` : ''}
@@ -617,6 +639,37 @@
                 }).join('');
             } catch(e) {
                 grid.innerHTML = '<div style="color: #EF4444;">Erro ao carregar dados.</div>';
+            }
+        }
+
+        function openRescheduleModal(id, topicEnc) {
+            const topic = decodeURIComponent(topicEnc);
+            document.getElementById('reschedule-post-id').value = id;
+            document.getElementById('reschedule-topic').innerText = `Matéria: ${topic}`;
+            document.getElementById('modal-reschedule').style.display = 'flex';
+        }
+
+        async function submitReschedule(e) {
+            e.preventDefault();
+            const id = document.getElementById('reschedule-post-id').value;
+            const scheduled_at = document.getElementById('reschedule-date-input').value;
+
+            try {
+                const res = await fetchWithAuth(`/api/posts/${id}/reschedule`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ scheduled_at })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    closeModal('modal-reschedule');
+                    fetchPosts(currentTab);
+                    fetchMetrics();
+                } else {
+                    alert('Erro ao reagendar: ' + (data.error || 'Tente novamente.'));
+                }
+            } catch(e) {
+                alert('Erro ao reagendar post.');
             }
         }
 
@@ -839,8 +892,8 @@
             document.getElementById('modal-preview').style.display = 'flex';
         }
 
-        function closeModal() {
-            document.getElementById('modal-preview').style.display = 'none';
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
         }
 
         async function handleGenerate(e) {

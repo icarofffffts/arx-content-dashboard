@@ -156,7 +156,29 @@ app.post('/api/posts/:id/publish-now', async (req, res) => {
   }
 });
 
-// 5. API: Delete Post and Cleanup Media
+// 5. API: Reschedule Post to Future Date/Time
+app.patch('/api/posts/:id/reschedule', async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const { scheduled_at } = req.body;
+
+    if (!scheduled_at) {
+      return res.status(400).json({ error: 'A nova data e hora de agendamento são obrigatórias!' });
+    }
+
+    await pool.query(`
+      UPDATE public.content_pipeline 
+      SET scheduled_at = $1, status = 'scheduled', updated_at = NOW() 
+      WHERE id = $2;
+    `, [new Date(scheduled_at), postId]);
+
+    res.json({ success: true, message: 'Agendamento atualizado com sucesso!' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 6. API: Delete Post and Cleanup Media
 app.delete('/api/posts/:id', async (req, res) => {
   try {
     const postId = req.params.id;
@@ -183,7 +205,7 @@ app.delete('/api/posts/:id', async (req, res) => {
   }
 });
 
-// 6. API: Get Promotions List & Click Metrics
+// 7. API: Get Promotions List & Click Metrics
 app.get('/api/v1/promos', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -205,7 +227,7 @@ app.get('/api/v1/promos', async (req, res) => {
   }
 });
 
-// 7. API: Broadcast New Promo Offer to Telegram & WhatsApp
+// 8. API: Broadcast New Promo Offer to Telegram & WhatsApp
 app.post('/api/v1/promos/broadcast', async (req, res) => {
   try {
     const { title, original_price, promo_price, store_name, original_url, image_url } = req.body;
@@ -240,7 +262,7 @@ app.post('/api/v1/promos/broadcast', async (req, res) => {
   }
 });
 
-// 8. API: Get Leads List
+// 9. API: Get Leads List
 app.get('/api/v1/leads', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -258,7 +280,7 @@ app.get('/api/v1/leads', async (req, res) => {
   }
 });
 
-// 9. API: Get Lead Statistics
+// 10. API: Get Lead Statistics
 app.get('/api/v1/leads/stats', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -284,7 +306,7 @@ app.get('/api/v1/leads/stats', async (req, res) => {
   }
 });
 
-// 10. API: Webhook for DM Lead Processing
+// 11. API: Webhook for DM Lead Processing
 app.post('/api/v1/leads/dm-webhook', async (req, res) => {
   try {
     const { sender_id, sender_handle, full_name, email, post_id, is_following, message_text } = req.body;
@@ -333,7 +355,7 @@ app.post('/api/v1/leads/dm-webhook', async (req, res) => {
   }
 });
 
-// 11. API: Generate Secure Hashed Short Link
+// 12. API: Generate Secure Hashed Short Link
 app.post('/api/shorten', async (req, res) => {
   try {
     const { original_url, post_id } = req.body;
@@ -356,7 +378,7 @@ app.post('/api/shorten', async (req, res) => {
   }
 });
 
-// 12. API: Get All Hashed Short Links
+// 13. API: Get All Hashed Short Links
 app.get('/api/shortlinks', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -371,7 +393,7 @@ app.get('/api/shortlinks', async (req, res) => {
   }
 });
 
-// 13. Secure Hashed Link Resolver & Click Tracker (`/r/:code`)
+// 14. Secure Hashed Link Resolver & Click Tracker (`/r/:code`)
 app.get('/r/:code', async (req, res) => {
   try {
     const code = req.params.code;
@@ -393,7 +415,7 @@ app.get('/r/:code', async (req, res) => {
   }
 });
 
-// 14. API: Trigger New Custom Content Generation with Schedule Options
+// 15. API: Trigger New Custom Content Generation with Schedule Options
 app.post('/api/generate', async (req, res) => {
   try {
     const { topic, channel, publish_mode, scheduled_at } = req.body;
