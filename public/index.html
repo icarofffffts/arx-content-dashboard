@@ -312,7 +312,7 @@
             <div class="logo-icon">A</div>
             <div>
                 <div class="logo-text">Arx Content Factory</div>
-                <div class="logo-sub">Painel Master TypeScript & Agendamento Inteligente</div>
+                <div class="logo-sub">Painel Master TypeScript & PromoHunter Bot</div>
             </div>
         </div>
     </header>
@@ -337,8 +337,8 @@
                 <div class="metric-value" id="m-leads" style="color: #EC4899;">0</div>
             </div>
             <div class="metric-card">
-                <div class="metric-title">✅ Publicados Total</div>
-                <div class="metric-value" id="m-published" style="color: #4ADE80;">0</div>
+                <div class="metric-title">🔥 Ofertas Ativas (Deals Bot)</div>
+                <div class="metric-value" id="m-promos" style="color: #F97316;">0</div>
             </div>
         </div>
 
@@ -348,12 +348,65 @@
             <button class="tab-btn" onclick="switchTab('scheduled')">⏳ Aguardando Envio</button>
             <button class="tab-btn" onclick="switchTab('published')">✅ Publicados</button>
             <button class="tab-btn" onclick="switchTab('leads')">🎯 Leads Capturados por DM (TS Engine)</button>
+            <button class="tab-btn" onclick="switchTab('promos')">🔥 Deals Bot (WhatsApp & Telegram)</button>
             <button class="tab-btn" onclick="switchTab('shortlinks')">🔗 Links Hasheados (Auto-DM)</button>
             <button class="tab-btn" onclick="switchTab('generate')">⚡ Solicitar Conteúdo</button>
         </div>
 
         <!-- Posts Grid View -->
         <div id="view-posts" class="posts-grid"></div>
+
+        <!-- Deals Bot View -->
+        <div id="view-promos" style="display: none;">
+            <div class="generator-box" style="max-width: 1100px;">
+                <h2 style="margin-bottom: 20px; font-size: 22px;">🔥 PromoHunter Bot - Ofertas Rastreáveis & Disparo Automático</h2>
+                
+                <form id="promo-form" onsubmit="handlePromoSubmit(event)" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; background: rgba(15,23,42,0.6); padding: 24px; border-radius: 18px;">
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label class="form-label">Título da Oferta / Produto</label>
+                        <input type="text" id="promo-title" class="form-input" placeholder="Ex: Placa de Vídeo RTX 4070 Super 12GB ASUS" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Loja Parceira</label>
+                        <select id="promo-store" class="form-input">
+                            <option value="Amazon">Amazon</option>
+                            <option value="Mercado Livre">Mercado Livre</option>
+                            <option value="Kabum">Kabum</option>
+                            <option value="Shopee">Shopee</option>
+                            <option value="Magazine Luiza">Magazine Luiza</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Preço Promocional (R$)</label>
+                        <input type="number" step="0.01" id="promo-price" class="form-input" placeholder="Ex: 3899.00" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Preço Original / De (R$)</label>
+                        <input type="number" step="0.01" id="promo-orig-price" class="form-input" placeholder="Ex: 4599.00">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Link Original de Afiliado</label>
+                        <input type="url" id="promo-url" class="form-input" placeholder="https://amazon.com.br/dp/..." required>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="grid-column: span 2; padding: 14px; font-size: 16px;">🚀 Gerar Copy & Disparar Oferta</button>
+                </form>
+
+                <table class="links-table">
+                    <thead>
+                        <tr>
+                            <th>Produto / Loja</th>
+                            <th>Preço & Desconto</th>
+                            <th>Link Afiliado Hasheado</th>
+                            <th>Cliques</th>
+                            <th>Data</th>
+                        </tr>
+                    </thead>
+                    <tbody id="promos-body">
+                        <tr><td colspan="5" style="color: #94A3B8;">Carregando ofertas promocionais...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
         <!-- Leads View -->
         <div id="view-leads" style="display: none;">
@@ -405,7 +458,7 @@
             </div>
         </div>
 
-        <!-- Generator On-Demand View with Scheduling -->
+        <!-- Generator On-Demand View -->
         <div id="view-generate" style="display: none;">
             <div class="generator-box">
                 <h2 style="margin-bottom: 20px; font-size: 24px;">⚡ Solicitar ou Agendar Conteúdo</h2>
@@ -471,6 +524,12 @@
             document.getElementById('m-published').innerText = data.published || 0;
 
             try {
+                const resPromos = await fetch('/api/v1/promos');
+                const promos = await resPromos.json();
+                document.getElementById('m-promos').innerText = promos.length || 0;
+            } catch(e){}
+
+            try {
                 const resLeads = await fetch('/api/v1/leads/stats');
                 const leadsStats = await resLeads.json();
                 document.getElementById('m-leads').innerText = leadsStats.total_leads || 0;
@@ -527,6 +586,63 @@
                     </div>
                 `;
             }).join('');
+        }
+
+        async function fetchPromos() {
+            const tbody = document.getElementById('promos-body');
+            tbody.innerHTML = '<tr><td colspan="5" style="color: #94A3B8;">Carregando ofertas promocionais...</td></tr>';
+            try {
+                const res = await fetch('/api/v1/promos');
+                const promos = await res.json();
+
+                if (promos.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="color: #94A3B8;">Nenhuma oferta ativa cadastrada. Use o formulário acima para disparar a primeira promoção!</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = promos.map(pr => `
+                    <tr>
+                        <td style="font-weight: 700; color: #F8FAFC;">
+                            ${pr.title}
+                            <br><span class="badge" style="background: rgba(249, 115, 22, 0.2); color: #FB923C; border: 1px solid rgba(249, 115, 22, 0.4); margin-top: 4px;">${pr.store_name}</span>
+                        </td>
+                        <td>
+                            <span style="font-size: 16px; font-weight: 900; color: #4ADE80;">R$ ${parseFloat(pr.promo_price).toFixed(2)}</span>
+                            ${pr.discount_percentage ? `<br><span style="color: #EF4444; font-weight: 700; font-size: 12px;">🔥 ${pr.discount_percentage}% OFF</span>` : ''}
+                        </td>
+                        <td><a href="${pr.short_url}" target="_blank" style="color: #60A5FA; font-weight: 600;">${pr.short_url}</a></td>
+                        <td style="font-weight: 700; color: #38BDF8;">📊 ${pr.clicks} cliques</td>
+                        <td style="color: #64748B; font-size: 13px;">${new Date(pr.created_at).toLocaleString('pt-BR')}</td>
+                    </tr>
+                `).join('');
+            } catch(e) {
+                tbody.innerHTML = '<tr><td colspan="5" style="color: #EF4444;">Erro ao carregar promoções.</td></tr>';
+            }
+        }
+
+        async function handlePromoSubmit(e) {
+            e.preventDefault();
+            const title = document.getElementById('promo-title').value;
+            const store_name = document.getElementById('promo-store').value;
+            const promo_price = document.getElementById('promo-price').value;
+            const original_price = document.getElementById('promo-orig-price').value;
+            const original_url = document.getElementById('promo-url').value;
+
+            try {
+                const res = await fetch('/api/v1/promos/broadcast', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, store_name, promo_price, original_price, original_url })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('🔥 Oferta cadastrada e encurtada com sucesso! Link seguro gerado.');
+                    fetchPromos();
+                    fetchMetrics();
+                }
+            } catch(e) {
+                alert('Erro ao cadastrar promoção.');
+            }
         }
 
         async function publishNow(postId) {
@@ -655,6 +771,7 @@
 
             document.getElementById('view-posts').style.display = 'none';
             document.getElementById('view-leads').style.display = 'none';
+            document.getElementById('view-promos').style.display = 'none';
             document.getElementById('view-shortlinks').style.display = 'none';
             document.getElementById('view-generate').style.display = 'none';
 
@@ -663,6 +780,9 @@
             } else if (tab === 'leads') {
                 document.getElementById('view-leads').style.display = 'block';
                 fetchLeads();
+            } else if (tab === 'promos') {
+                document.getElementById('view-promos').style.display = 'block';
+                fetchPromos();
             } else if (tab === 'shortlinks') {
                 document.getElementById('view-shortlinks').style.display = 'block';
                 fetchShortLinks();

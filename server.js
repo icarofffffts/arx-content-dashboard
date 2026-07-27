@@ -10,7 +10,6 @@ app.use(express.json());
 
 const MASTER_USER = 'admin';
 const MASTER_PASS = 'arx_secret_2026!';
-// Deterministic Master Token derived from secret key (never lost on server restart)
 const MASTER_TOKEN = crypto.createHmac('sha256', 'arx_master_secret_key_2026').update(`${MASTER_USER}:${MASTER_PASS}`).digest('hex');
 
 // PostgreSQL Database Connection
@@ -38,13 +37,12 @@ function parseCookies(req) {
   return list;
 }
 
-// 1. Login API Endpoint (Case-Insensitive Username & Space Trimming)
+// 1. Login API Endpoint
 app.post('/api/login', (req, res) => {
   const username = (req.body.username || '').trim().toLowerCase();
   const password = (req.body.password || '').trim();
 
   if (username === MASTER_USER && password === MASTER_PASS) {
-    // Set cookie for browser session
     res.setHeader('Set-Cookie', `arx_token=${MASTER_TOKEN}; Path=/; SameSite=Lax; Max-Age=864000`);
     return res.json({ success: true, token: MASTER_TOKEN });
   }
@@ -185,7 +183,64 @@ app.delete('/api/posts/:id', async (req, res) => {
   }
 });
 
-// 6. API: Get Leads List
+// 6. API: Get Promotions List & Click Metrics
+app.get('/api/v1/promos', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        p.id, p.title, p.original_price, p.promo_price, p.discount_percentage,
+        p.store_name, p.original_url, p.short_code, p.image_url, p.created_at,
+        COALESCE(s.clicks, 0) AS clicks
+      FROM public.promotions p
+      LEFT JOIN public.short_links s ON p.short_code = s.short_code
+      ORDER BY p.created_at DESC LIMIT 50;
+    `);
+    const promos = result.rows.map(r => ({
+      ...r,
+      short_url: `https://conteudos.icarodev.cloud/r/${r.short_code}`
+    }));
+    res.json(promos);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 7. API: Broadcast New Promo Offer to Telegram & WhatsApp
+app.post('/api/v1/promos/broadcast', async (req, res) => {
+  try {
+    const { title, original_price, promo_price, store_name, original_url, image_url } = req.body;
+    if (!title || !promo_price || !original_url) {
+      return res.status(400).json({ error: 'Título, Preço Promocional e URL Original são obrigatórios!' });
+    }
+
+    const origPrice = parseFloat(original_price || promo_price);
+    const pPrice = parseFloat(promo_price);
+    const discountPct = origPrice > pPrice ? Math.round(((origPrice - pPrice) / origPrice) * 100) : 0;
+
+    const hash = crypto.createHash('md5').update(original_url + Date.now()).digest('hex').substring(0, 8);
+    const shortCode = `promo_${hash}`;
+    const shortUrl = `https://conteudos.icarodev.cloud/r/${shortCode}`;
+
+    await pool.query(`
+      INSERT INTO public.short_links (short_code, original_url)
+      VALUES ($1, $2) ON CONFLICT DO NOTHING;
+    `, [shortCode, original_url]);
+
+    const result = await pool.query(`
+      INSERT INTO public.promotions (
+        title, original_price, promo_price, discount_percentage,
+        store_name, original_url, short_code, image_url
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING *;
+    `, [title, origPrice, pPrice, discountPct, store_name || 'Loja Parceira', original_url, shortCode, image_url || 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=600&q=80']);
+
+    res.json({ success: true, promotion: result.rows[0], short_url: shortUrl });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 8. API: Get Leads List
 app.get('/api/v1/leads', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -203,7 +258,7 @@ app.get('/api/v1/leads', async (req, res) => {
   }
 });
 
-// 7. API: Get Lead Statistics
+// 9. API: Get Lead Statistics
 app.get('/api/v1/leads/stats', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -229,7 +284,7 @@ app.get('/api/v1/leads/stats', async (req, res) => {
   }
 });
 
-// 8. API: Webhook for DM Lead Processing
+// 10. API: Webhook for DM Lead Processing
 app.post('/api/v1/leads/dm-webhook', async (req, res) => {
   try {
     const { sender_id, sender_handle, full_name, email, post_id, is_following, message_text } = req.body;
@@ -278,7 +333,7 @@ app.post('/api/v1/leads/dm-webhook', async (req, res) => {
   }
 });
 
-// 9. API: Generate Secure Hashed Short Link
+// 11. API: Generate Secure Hashed Short Link
 app.post('/api/shorten', async (req, res) => {
   try {
     const { original_url, post_id } = req.body;
@@ -301,7 +356,7 @@ app.post('/api/shorten', async (req, res) => {
   }
 });
 
-// 10. API: Get All Hashed Short Links
+// 12. API: Get All Hashed Short Links
 app.get('/api/shortlinks', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -316,7 +371,7 @@ app.get('/api/shortlinks', async (req, res) => {
   }
 });
 
-// 11. Secure Hashed Link Resolver & Click Tracker (`/r/:code`)
+// 13. Secure Hashed Link Resolver & Click Tracker (`/r/:code`)
 app.get('/r/:code', async (req, res) => {
   try {
     const code = req.params.code;
@@ -338,7 +393,7 @@ app.get('/r/:code', async (req, res) => {
   }
 });
 
-// 12. API: Trigger New Custom Content Generation with Schedule Options
+// 14. API: Trigger New Custom Content Generation with Schedule Options
 app.post('/api/generate', async (req, res) => {
   try {
     const { topic, channel, publish_mode, scheduled_at } = req.body;
