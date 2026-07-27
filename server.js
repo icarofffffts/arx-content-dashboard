@@ -168,7 +168,6 @@ app.patch('/api/posts/:id/reschedule', async (req, res) => {
       return res.status(400).json({ error: 'A nova data e hora de agendamento são obrigatórias!' });
     }
 
-    // Convert datetime-local (BRT) to UTC timestamp safely with offset -03:00
     const targetDate = new Date(`${scheduled_at}:00-03:00`);
 
     await pool.query(`
@@ -208,7 +207,7 @@ app.patch('/api/posts/:id/toggle-pause', async (req, res) => {
   }
 });
 
-// 7. API: Reorganize All Scheduled Posts based on Market Benchmark & Explicit BRT Timezone (America/Sao_Paulo UTC-3)
+// 7. API: Reorganize All Scheduled Posts based on Market Benchmark & Explicit BRT Timezone (Segunda a Sexta - Mon-Fri)
 app.post('/api/posts/reorganize-schedule', async (req, res) => {
   try {
     const postsRes = await pool.query(`
@@ -230,7 +229,7 @@ app.post('/api/posts/reorganize-schedule', async (req, res) => {
       { hour: '19', minute: '45', label: 'Instagram Noite (19h45 BRT)' }
     ];
 
-    const GOLDEN_DAYS = [2, 3, 4]; // Tue, Wed, Thu
+    const GOLDEN_DAYS = [1, 2, 3, 4, 5]; // Mon, Tue, Wed, Thu, Fri (Segunda a Sexta)
     
     // Start tomorrow in BRT
     let curr = new Date();
@@ -250,7 +249,6 @@ app.post('/api/posts/reorganize-schedule', async (req, res) => {
       const mm = String(curr.getMonth() + 1).padStart(2, '0');
       const dd = String(curr.getDate()).padStart(2, '0');
       
-      // Explicit ISO String with BRT offset (-03:00) so PostgreSQL stores exact UTC equivalent
       const isoStr = `${yyyy}-${mm}-${dd}T${slot.hour}:${slot.minute}:00-03:00`;
       const targetDate = new Date(isoStr);
 
@@ -280,7 +278,7 @@ app.post('/api/posts/reorganize-schedule', async (req, res) => {
 
     res.json({
       success: true,
-      message: `${scheduledPosts.length} matérias reorganizadas com fuso horário ajustado para o Brasil (BRT / UTC-3)!`,
+      message: `${scheduledPosts.length} matérias reorganizadas com fuso horário ajustado para o Brasil (BRT / UTC-3) incluindo Segundas-feiras!`,
       updated_posts: updatedList
     });
   } catch (err) {
