@@ -205,7 +205,77 @@ app.patch('/api/posts/:id/toggle-pause', async (req, res) => {
   }
 });
 
-// 7. API: Delete Post and Cleanup Media
+// 7. API: Reorganize All Scheduled Posts into Business Days (Mon-Fri) & LinkedIn Peak Hours (09:15, 12:30, 17:45)
+app.post('/api/posts/reorganize-schedule', async (req, res) => {
+  try {
+    const postsRes = await pool.query(`
+      SELECT id, topic FROM public.content_pipeline 
+      WHERE status = 'scheduled' 
+      ORDER BY created_at ASC;
+    `);
+
+    const scheduledPosts = postsRes.rows;
+    if (scheduledPosts.length === 0) {
+      return res.json({ success: true, message: 'Nenhuma matéria agendada para reorganizar.' });
+    }
+
+    const PEAK_SLOTS = [
+      { hour: 9, minute: 15 },   // LinkedIn Morning Peak (09:15)
+      { hour: 12, minute: 30 },  // LinkedIn Lunch Peak (12:30)
+      { hour: 17, minute: 45 }   // LinkedIn Evening Peak (17:45)
+    ];
+
+    let currentDate = new Date();
+    currentDate.setDate(currentDate.getDate() + 1); // Start starting tomorrow
+
+    // Ensure initial date is a business day (Monday - Friday)
+    while (currentDate.getDay() === 0 || currentDate.getDay() === 6) {
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    let slotIndex = 0;
+    const updatedList = [];
+
+    for (const post of scheduledPosts) {
+      const slot = PEAK_SLOTS[slotIndex];
+      const targetDate = new Date(currentDate);
+      targetDate.setHours(slot.hour, slot.minute, 0, 0);
+
+      await pool.query(`
+        UPDATE public.content_pipeline
+        SET scheduled_at = $1, updated_at = NOW()
+        WHERE id = $2;
+      `, [targetDate, post.id]);
+
+      updatedList.push({
+        id: post.id,
+        topic: post.topic,
+        scheduled_at: targetDate
+      });
+
+      slotIndex++;
+      if (slotIndex >= PEAK_SLOTS.length) {
+        slotIndex = 0;
+        // Advance to next day
+        currentDate.setDate(currentDate.getDate() + 1);
+        // Skip Saturday (6) and Sunday (0)
+        while (currentDate.getDay() === 0 || currentDate.getDay() === 6) {
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `${scheduledPosts.length} matérias foram reorganizadas para Dias Úteis (Seg-Sex) nos horários de pico do LinkedIn (09:15, 12:30, 17:45)!`,
+      updated_posts: updatedList
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 8. API: Delete Post and Cleanup Media
 app.delete('/api/posts/:id', async (req, res) => {
   try {
     const postId = req.params.id;
@@ -232,7 +302,7 @@ app.delete('/api/posts/:id', async (req, res) => {
   }
 });
 
-// 8. API: Get Promotions List & Click Metrics
+// 9. API: Get Promotions List & Click Metrics
 app.get('/api/v1/promos', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -254,7 +324,7 @@ app.get('/api/v1/promos', async (req, res) => {
   }
 });
 
-// 9. API: Broadcast New Promo Offer to Telegram & WhatsApp
+// 10. API: Broadcast New Promo Offer to Telegram & WhatsApp
 app.post('/api/v1/promos/broadcast', async (req, res) => {
   try {
     const { title, original_price, promo_price, store_name, original_url, image_url } = req.body;
@@ -289,7 +359,7 @@ app.post('/api/v1/promos/broadcast', async (req, res) => {
   }
 });
 
-// 10. API: Get Leads List
+// 11. API: Get Leads List
 app.get('/api/v1/leads', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -307,7 +377,7 @@ app.get('/api/v1/leads', async (req, res) => {
   }
 });
 
-// 11. API: Get Lead Statistics
+// 12. API: Get Lead Statistics
 app.get('/api/v1/leads/stats', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -333,7 +403,7 @@ app.get('/api/v1/leads/stats', async (req, res) => {
   }
 });
 
-// 12. API: Webhook for DM Lead Processing
+// 13. API: Webhook for DM Lead Processing
 app.post('/api/v1/leads/dm-webhook', async (req, res) => {
   try {
     const { sender_id, sender_handle, full_name, email, post_id, is_following, message_text } = req.body;
@@ -382,7 +452,7 @@ app.post('/api/v1/leads/dm-webhook', async (req, res) => {
   }
 });
 
-// 13. API: Generate Secure Hashed Short Link
+// 14. API: Generate Secure Hashed Short Link
 app.post('/api/shorten', async (req, res) => {
   try {
     const { original_url, post_id } = req.body;
@@ -405,7 +475,7 @@ app.post('/api/shorten', async (req, res) => {
   }
 });
 
-// 14. API: Get All Hashed Short Links
+// 15. API: Get All Hashed Short Links
 app.get('/api/shortlinks', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -420,7 +490,7 @@ app.get('/api/shortlinks', async (req, res) => {
   }
 });
 
-// 15. Secure Hashed Link Resolver & Click Tracker (`/r/:code`)
+// 16. Secure Hashed Link Resolver & Click Tracker (`/r/:code`)
 app.get('/r/:code', async (req, res) => {
   try {
     const code = req.params.code;
@@ -442,7 +512,7 @@ app.get('/r/:code', async (req, res) => {
   }
 });
 
-// 16. API: Trigger New Custom Content Generation with Schedule Options
+// 17. API: Trigger New Custom Content Generation with Schedule Options
 app.post('/api/generate', async (req, res) => {
   try {
     const { topic, channel, publish_mode, scheduled_at } = req.body;

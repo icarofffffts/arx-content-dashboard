@@ -237,6 +237,8 @@
         .btn-publish-now:hover { transform: scale(1.02); box-shadow: 0 0 24px rgba(16, 185, 129, 0.5); }
         .btn-reschedule { background: linear-gradient(135deg, #8B5CF6, #6D28D9); color: white; }
         .btn-reschedule:hover { background: #5B21B6; }
+        .btn-reorganize { background: linear-gradient(135deg, #7C3AED, #2563EB); color: white; padding: 12px 20px; font-size: 14px; box-shadow: 0 0 20px rgba(124, 58, 237, 0.4); margin-bottom: 24px; }
+        .btn-reorganize:hover { transform: translateY(-2px); box-shadow: 0 0 30px rgba(124, 58, 237, 0.6); }
         .btn-pause { background: rgba(249, 115, 22, 0.2); color: #FB923C; border: 1px solid rgba(249, 115, 22, 0.4); }
         .btn-pause:hover { background: rgba(249, 115, 22, 0.4); color: white; }
         .btn-resume { background: rgba(34, 197, 94, 0.2); color: #4ADE80; border: 1px solid rgba(34, 197, 94, 0.4); }
@@ -317,7 +319,7 @@
             <div class="logo-icon">A</div>
             <div>
                 <div class="logo-text">Arx Content Factory</div>
-                <div class="logo-sub">Painel Master TypeScript & Agendamento Flexível</div>
+                <div class="logo-sub">Painel Master TypeScript & Agendamento Inteligente</div>
             </div>
         </div>
         <button class="btn btn-danger" onclick="logout()">🚪 Sair</button>
@@ -362,6 +364,10 @@
             <button class="tab-btn" onclick="switchTab('promos')">🔥 Deals Bot (WhatsApp & Telegram)</button>
             <button class="tab-btn" onclick="switchTab('shortlinks')">🔗 Links Hasheados (Auto-DM)</button>
             <button class="tab-btn" onclick="switchTab('generate')">⚡ Solicitar Conteúdo</button>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <button class="btn btn-reorganize" onclick="reorganizeSchedule()">🗓️ Reorganizar Fila para Dias Úteis (Seg-Sex) & Horários de Pico (09:15, 12:30, 17:45)</button>
         </div>
 
         <!-- Posts Grid View -->
@@ -610,8 +616,11 @@
                     if (typeof mediaList === 'string') { try { mediaList = JSON.parse(mediaList); } catch(e){} }
                     const thumb = mediaList[0] || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80';
                     
-                    const createdDate = new Date(p.created_at).toLocaleString('pt-BR');
-                    const schedDate = p.scheduled_at ? new Date(p.scheduled_at).toLocaleString('pt-BR') : createdDate;
+                    const d = p.scheduled_at ? new Date(p.scheduled_at) : new Date(p.created_at);
+                    const schedDateStr = d.toLocaleString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                    const dayBadge = isWeekend ? '⚠️ Final de Semana' : '💼 Dia Útil';
+
                     const pct = p.progress_percentage || 25;
                     const stageText = pct === 25 ? '🧠 Gerando & Fact-Checking' : p.status === 'paused' ? '⏸️ Pausado na Fila' : pct === 75 ? '📅 Agendado & Seguro' : '🚀 Publicado com Sucesso';
 
@@ -619,7 +628,10 @@
                         <div class="post-card" id="card-${p.id}">
                             <img src="${thumb}" class="post-thumb" alt="Thumbnail Slide" />
                             <div class="post-content">
-                                <span class="badge badge-${p.status}">${p.status === 'paused' ? '⏸️ PAUSADO' : p.status}</span>
+                                <div style="display: flex; gap: 6px; align-items: center;">
+                                    <span class="badge badge-${p.status}">${p.status === 'paused' ? '⏸️ PAUSADO' : p.status}</span>
+                                    <span class="badge" style="background: rgba(255,255,255,0.06); color: ${isWeekend ? '#FCA5A5' : '#60A5FA'}; border: 1px solid rgba(255,255,255,0.1); font-size: 10px;">${dayBadge}</span>
+                                </div>
                                 <div class="post-title">${p.topic}</div>
                                 
                                 <div class="progress-box">
@@ -632,7 +644,7 @@
                                     </div>
                                 </div>
 
-                                <div class="post-date">📅 Agendado para: <strong style="color: #F8FAFC;">${schedDate}</strong></div>
+                                <div class="post-date">📅 Horário: <strong style="color: #F8FAFC;">${schedDateStr}</strong></div>
                                 <div class="post-actions">
                                     ${p.status === 'scheduled' || p.status === 'paused' ? `
                                         <button class="btn btn-publish-now" id="pub-btn-${p.id}" onclick="publishNow('${p.id}')">🚀 Publicar Agora</button>
@@ -653,6 +665,24 @@
                 }).join('');
             } catch(e) {
                 grid.innerHTML = '<div style="color: #EF4444;">Erro ao carregar dados.</div>';
+            }
+        }
+
+        async function reorganizeSchedule() {
+            if (!confirm('Deseja reorganizar toda a fila agendada para distribuir as matérias estritamente de Segunda a Sexta nos horários de pico do LinkedIn (09:15, 12:30, 17:45)?')) return;
+            
+            try {
+                const res = await fetchWithAuth('/api/posts/reorganize-schedule', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    alert('✅ ' + data.message);
+                    fetchPosts(currentTab);
+                    fetchMetrics();
+                } else {
+                    alert('Erro ao reorganizar: ' + (data.error || 'Tente novamente.'));
+                }
+            } catch(e) {
+                alert('Erro ao reorganizar agendamentos.');
             }
         }
 
