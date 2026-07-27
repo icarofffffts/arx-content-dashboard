@@ -160,7 +160,7 @@
             display: inline-block;
             padding: 4px 12px;
             border-radius: 9999px;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 700;
             text-transform: uppercase;
             width: fit-content;
@@ -171,7 +171,8 @@
         .badge-posted_linkedin { background: rgba(59, 130, 246, 0.2); color: #60A5FA; border: 1px solid rgba(59, 130, 246, 0.4); }
         .badge-posted_instagram { background: rgba(236, 72, 153, 0.2); color: #F472B6; border: 1px solid rgba(236, 72, 153, 0.4); }
         .badge-published { background: rgba(34, 197, 94, 0.2); color: #4ADE80; border: 1px solid rgba(34, 197, 94, 0.4); }
-        
+        .badge-gold { background: linear-gradient(135deg, rgba(234, 179, 8, 0.3), rgba(245, 158, 11, 0.3)); color: #FDE047; border: 1px solid rgba(234, 179, 8, 0.6); box-shadow: 0 0 12px rgba(234, 179, 8, 0.3); }
+
         .progress-box {
             background: rgba(15, 23, 42, 0.6);
             border-radius: 14px;
@@ -237,8 +238,8 @@
         .btn-publish-now:hover { transform: scale(1.02); box-shadow: 0 0 24px rgba(16, 185, 129, 0.5); }
         .btn-reschedule { background: linear-gradient(135deg, #8B5CF6, #6D28D9); color: white; }
         .btn-reschedule:hover { background: #5B21B6; }
-        .btn-reorganize { background: linear-gradient(135deg, #7C3AED, #2563EB); color: white; padding: 12px 20px; font-size: 14px; box-shadow: 0 0 20px rgba(124, 58, 237, 0.4); margin-bottom: 24px; }
-        .btn-reorganize:hover { transform: translateY(-2px); box-shadow: 0 0 30px rgba(124, 58, 237, 0.6); }
+        .btn-reorganize { background: linear-gradient(135deg, #F59E0B, #7C3AED); color: white; padding: 14px 24px; font-size: 15px; font-weight: 700; box-shadow: 0 0 24px rgba(245, 158, 11, 0.4); margin-bottom: 28px; border-radius: 14px; border: none; cursor: pointer; transition: all 0.25s ease; width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .btn-reorganize:hover { transform: translateY(-2px); box-shadow: 0 0 36px rgba(245, 158, 11, 0.6); }
         .btn-pause { background: rgba(249, 115, 22, 0.2); color: #FB923C; border: 1px solid rgba(249, 115, 22, 0.4); }
         .btn-pause:hover { background: rgba(249, 115, 22, 0.4); color: white; }
         .btn-resume { background: rgba(34, 197, 94, 0.2); color: #4ADE80; border: 1px solid rgba(34, 197, 94, 0.4); }
@@ -319,7 +320,7 @@
             <div class="logo-icon">A</div>
             <div>
                 <div class="logo-text">Arx Content Factory</div>
-                <div class="logo-sub">Painel Master TypeScript & Agendamento Inteligente</div>
+                <div class="logo-sub">Painel Master TypeScript & Benchmark Sprout Social / Hootsuite</div>
             </div>
         </div>
         <button class="btn btn-danger" onclick="logout()">🚪 Sair</button>
@@ -366,9 +367,9 @@
             <button class="tab-btn" onclick="switchTab('generate')">⚡ Solicitar Conteúdo</button>
         </div>
 
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <button class="btn btn-reorganize" onclick="reorganizeSchedule()">🗓️ Reorganizar Fila para Dias Úteis (Seg-Sex) & Horários de Pico (09:15, 12:30, 17:45)</button>
-        </div>
+        <button class="btn btn-reorganize" onclick="reorganizeSchedule()">
+            🏆 Reorganizar Fila para Dias de Ouro (Terça, Quarta e Quinta) & Horários de Pico (08:45, 12:15, 17:15, 19:45)
+        </button>
 
         <!-- Posts Grid View -->
         <div id="view-posts" class="posts-grid"></div>
@@ -618,8 +619,19 @@
                     
                     const d = p.scheduled_at ? new Date(p.scheduled_at) : new Date(p.created_at);
                     const schedDateStr = d.toLocaleString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-                    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                    const dayBadge = isWeekend ? '⚠️ Final de Semana' : '💼 Dia Útil';
+                    
+                    const dayNum = d.getDay(); // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+                    const isGoldDay = dayNum === 2 || dayNum === 3 || dayNum === 4; // Tue, Wed, Thu
+                    const isWeekend = dayNum === 0 || dayNum === 6;
+
+                    let dayBadgeHtml = '';
+                    if (isGoldDay) {
+                        dayBadgeHtml = `<span class="badge badge-gold">🏆 DIA DE OURO (Ter-Qui)</span>`;
+                    } else if (isWeekend) {
+                        dayBadgeHtml = `<span class="badge" style="background: rgba(239,68,68,0.2); color: #FCA5A5; border: 1px solid rgba(239,68,68,0.4);">⚠️ Final de Semana</span>`;
+                    } else {
+                        dayBadgeHtml = `<span class="badge" style="background: rgba(255,255,255,0.06); color: #60A5FA; border: 1px solid rgba(255,255,255,0.1);">💼 Dia Útil</span>`;
+                    }
 
                     const pct = p.progress_percentage || 25;
                     const stageText = pct === 25 ? '🧠 Gerando & Fact-Checking' : p.status === 'paused' ? '⏸️ Pausado na Fila' : pct === 75 ? '📅 Agendado & Seguro' : '🚀 Publicado com Sucesso';
@@ -628,9 +640,9 @@
                         <div class="post-card" id="card-${p.id}">
                             <img src="${thumb}" class="post-thumb" alt="Thumbnail Slide" />
                             <div class="post-content">
-                                <div style="display: flex; gap: 6px; align-items: center;">
+                                <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
                                     <span class="badge badge-${p.status}">${p.status === 'paused' ? '⏸️ PAUSADO' : p.status}</span>
-                                    <span class="badge" style="background: rgba(255,255,255,0.06); color: ${isWeekend ? '#FCA5A5' : '#60A5FA'}; border: 1px solid rgba(255,255,255,0.1); font-size: 10px;">${dayBadge}</span>
+                                    ${dayBadgeHtml}
                                 </div>
                                 <div class="post-title">${p.topic}</div>
                                 
@@ -669,7 +681,7 @@
         }
 
         async function reorganizeSchedule() {
-            if (!confirm('Deseja reorganizar toda a fila agendada para distribuir as matérias estritamente de Segunda a Sexta nos horários de pico do LinkedIn (09:15, 12:30, 17:45)?')) return;
+            if (!confirm('Deseja reorganizar toda a fila agendada com base no Estudo de Benchmark (Dias de Ouro Ter-Qui + Horários de Pico 08:45, 12:15, 17:15, 19:45)?')) return;
             
             try {
                 const res = await fetchWithAuth('/api/posts/reorganize-schedule', { method: 'POST' });

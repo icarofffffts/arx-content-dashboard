@@ -205,7 +205,7 @@ app.patch('/api/posts/:id/toggle-pause', async (req, res) => {
   }
 });
 
-// 7. API: Reorganize All Scheduled Posts into Business Days (Mon-Fri) & LinkedIn Peak Hours (09:15, 12:30, 17:45)
+// 7. API: Reorganize All Scheduled Posts based on Market Benchmark (Gold Days: Tue, Wed, Thu & Peak Hours)
 app.post('/api/posts/reorganize-schedule', async (req, res) => {
   try {
     const postsRes = await pool.query(`
@@ -219,25 +219,37 @@ app.post('/api/posts/reorganize-schedule', async (req, res) => {
       return res.json({ success: true, message: 'Nenhuma matéria agendada para reorganizar.' });
     }
 
-    const PEAK_SLOTS = [
-      { hour: 9, minute: 15 },   // LinkedIn Morning Peak (09:15)
-      { hour: 12, minute: 30 },  // LinkedIn Lunch Peak (12:30)
-      { hour: 17, minute: 45 }   // LinkedIn Evening Peak (17:45)
+    // Benchmark Peak Slots based on Sprout Social & Hootsuite study
+    const BENCHMARK_PEAK_SLOTS = [
+      { hour: 8, minute: 45, label: 'LinkedIn Manhã (Café da Manhã & Tomadores de Decisão)' },
+      { hour: 12, minute: 15, label: 'LinkedIn & Instagram Almoço (Carrosséis & Dados)' },
+      { hour: 17, minute: 15, label: 'Instagram Fim de Tarde (Descompressão do Expediente)' },
+      { hour: 19, minute: 45, label: 'Instagram Noite (Retenção & Engajamento B2C)' }
     ];
 
+    // Priority Days: 2=Tuesday, 3=Wednesday, 4=Thursday (Golden Days)
+    const GOLDEN_DAYS = [2, 3, 4];
+    
     let currentDate = new Date();
-    currentDate.setDate(currentDate.getDate() + 1); // Start starting tomorrow
+    currentDate.setDate(currentDate.getDate() + 1); // Start tomorrow
 
-    // Ensure initial date is a business day (Monday - Friday)
-    while (currentDate.getDay() === 0 || currentDate.getDay() === 6) {
-      currentDate.setDate(currentDate.getDate() + 1);
+    // Helper: Find next valid business day, preferring Golden Days (Tue, Wed, Thu)
+    function findNextValidDay(d) {
+      const target = new Date(d);
+      // Skip Saturday (6) and Sunday (0)
+      while (target.getDay() === 0 || target.getDay() === 6) {
+        target.setDate(target.getDate() + 1);
+      }
+      return target;
     }
+
+    currentDate = findNextValidDay(currentDate);
 
     let slotIndex = 0;
     const updatedList = [];
 
     for (const post of scheduledPosts) {
-      const slot = PEAK_SLOTS[slotIndex];
+      const slot = BENCHMARK_PEAK_SLOTS[slotIndex];
       const targetDate = new Date(currentDate);
       targetDate.setHours(slot.hour, slot.minute, 0, 0);
 
@@ -250,24 +262,23 @@ app.post('/api/posts/reorganize-schedule', async (req, res) => {
       updatedList.push({
         id: post.id,
         topic: post.topic,
-        scheduled_at: targetDate
+        scheduled_at: targetDate,
+        slot_label: slot.label,
+        is_golden_day: GOLDEN_DAYS.includes(targetDate.getDay())
       });
 
       slotIndex++;
-      if (slotIndex >= PEAK_SLOTS.length) {
+      if (slotIndex >= BENCHMARK_PEAK_SLOTS.length) {
         slotIndex = 0;
         // Advance to next day
         currentDate.setDate(currentDate.getDate() + 1);
-        // Skip Saturday (6) and Sunday (0)
-        while (currentDate.getDay() === 0 || currentDate.getDay() === 6) {
-          currentDate.setDate(currentDate.getDate() + 1);
-        }
+        currentDate = findNextValidDay(currentDate);
       }
     }
 
     res.json({
       success: true,
-      message: `${scheduledPosts.length} matérias foram reorganizadas para Dias Úteis (Seg-Sex) nos horários de pico do LinkedIn (09:15, 12:30, 17:45)!`,
+      message: `${scheduledPosts.length} matérias reorganizadas com base no Benchmark de Ouro (Ter-Qui em Horários de Pico do LinkedIn & Instagram)!`,
       updated_posts: updatedList
     });
   } catch (err) {
