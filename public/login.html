@@ -212,11 +212,11 @@
         function fillCredentialsAndSubmit() {
             document.getElementById('username').value = 'admin';
             document.getElementById('password').value = 'arx_secret_2026!';
-            document.getElementById('login-form').dispatchEvent(new Event('submit', { cancelable: true }));
+            handleLogin(new Event('submit'));
         }
 
         async function handleLogin(e) {
-            e.preventDefault();
+            if (e && e.preventDefault) e.preventDefault();
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value.trim();
             const errorBox = document.getElementById('error-box');
@@ -237,7 +237,8 @@
                 if (data.success && data.token) {
                     localStorage.setItem('arx_token', data.token);
                     document.cookie = `arx_token=${data.token}; path=/; max-age=864000; SameSite=Lax`;
-                    window.location.href = '/dashboard/';
+                    // Redirect passing token in query string so session NEVER fails even if cookie is blocked
+                    window.location.href = `/dashboard/?token=${data.token}`;
                 } else {
                     errorBox.innerText = '⚠️ ' + (data.error || 'Usuário ou senha incorretos!');
                     errorBox.style.display = 'block';

@@ -315,6 +315,7 @@
                 <div class="logo-sub">Painel Master TypeScript & PromoHunter Bot</div>
             </div>
         </div>
+        <button class="btn btn-danger" onclick="logout()">🚪 Sair</button>
     </header>
 
     <div class="container">
@@ -507,6 +508,35 @@
     </div>
 
     <script>
+        // Check & Process Token from Query string or localStorage
+        const urlParams = new URLSearchParams(window.location.search);
+        let token = urlParams.get('token');
+        if (token) {
+            localStorage.setItem('arx_token', token);
+            document.cookie = `arx_token=${token}; path=/; max-age=864000; SameSite=Lax`;
+            window.history.replaceState({}, document.title, window.location.pathname);
+        } else {
+            token = localStorage.getItem('arx_token');
+        }
+
+        async function fetchWithAuth(url, options = {}) {
+            options.headers = options.headers || {};
+            options.headers['x-arx-token'] = token || localStorage.getItem('arx_token') || '';
+            const res = await fetch(url, options);
+            if (res.status === 401) {
+                localStorage.removeItem('arx_token');
+                window.location.href = '/dashboard/';
+            }
+            return res;
+        }
+
+        async function logout() {
+            await fetchWithAuth('/api/logout', { method: 'POST' });
+            localStorage.removeItem('arx_token');
+            document.cookie = "arx_token=; path=/; max-age=0";
+            window.location.href = '/dashboard/';
+        }
+
         let currentTab = 'all';
         let cachedLeads = [];
 
@@ -516,21 +546,19 @@
         }
 
         async function fetchMetrics() {
-            const res = await fetch('/api/metrics');
-            const data = await res.json();
-            document.getElementById('m-total').innerText = data.total || 0;
-            document.getElementById('m-rendering').innerText = data.rendering || 0;
-            document.getElementById('m-scheduled').innerText = data.scheduled || 0;
-            document.getElementById('m-published').innerText = data.published || 0;
-
             try {
-                const resPromos = await fetch('/api/v1/promos');
+                const res = await fetchWithAuth('/api/metrics');
+                const data = await res.json();
+                document.getElementById('m-total').innerText = data.total || 0;
+                document.getElementById('m-rendering').innerText = data.rendering || 0;
+                document.getElementById('m-scheduled').innerText = data.scheduled || 0;
+                document.getElementById('m-published').innerText = data.published || 0;
+
+                const resPromos = await fetchWithAuth('/api/v1/promos');
                 const promos = await resPromos.json();
                 document.getElementById('m-promos').innerText = promos.length || 0;
-            } catch(e){}
 
-            try {
-                const resLeads = await fetch('/api/v1/leads/stats');
+                const resLeads = await fetchWithAuth('/api/v1/leads/stats');
                 const leadsStats = await resLeads.json();
                 document.getElementById('m-leads').innerText = leadsStats.total_leads || 0;
             } catch(e){}
@@ -539,60 +567,64 @@
         async function fetchPosts(status = 'all') {
             const grid = document.getElementById('view-posts');
             grid.innerHTML = '<div style="color: #94A3B8;">Carregando dados seguros do pipeline...</div>';
-            const res = await fetch(`/api/posts?status=${status}`);
-            const posts = await res.json();
+            try {
+                const res = await fetchWithAuth(`/api/posts?status=${status}`);
+                const posts = await res.json();
 
-            if (posts.length === 0) {
-                grid.innerHTML = '<div style="color: #94A3B8;">Nenhum post encontrado nesta categoria.</div>';
-                return;
-            }
+                if (!Array.isArray(posts) || posts.length === 0) {
+                    grid.innerHTML = '<div style="color: #94A3B8;">Nenhum post encontrado nesta categoria.</div>';
+                    return;
+                }
 
-            grid.innerHTML = posts.map(p => {
-                let mediaList = p.instagram_media_paths || p.media_paths || [];
-                if (typeof mediaList === 'string') { try { mediaList = JSON.parse(mediaList); } catch(e){} }
-                const thumb = mediaList[0] || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80';
-                
-                const createdDate = new Date(p.created_at).toLocaleString('pt-BR');
-                const pct = p.progress_percentage || 25;
-                const stageText = pct === 25 ? '🧠 Gerando & Fact-Checking' : pct === 75 ? '📅 Agendado & Seguro' : '🚀 Publicado com Sucesso';
+                grid.innerHTML = posts.map(p => {
+                    let mediaList = p.instagram_media_paths || p.media_paths || [];
+                    if (typeof mediaList === 'string') { try { mediaList = JSON.parse(mediaList); } catch(e){} }
+                    const thumb = mediaList[0] || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80';
+                    
+                    const createdDate = new Date(p.created_at).toLocaleString('pt-BR');
+                    const pct = p.progress_percentage || 25;
+                    const stageText = pct === 25 ? '🧠 Gerando & Fact-Checking' : pct === 75 ? '📅 Agendado & Seguro' : '🚀 Publicado com Sucesso';
 
-                return `
-                    <div class="post-card" id="card-${p.id}">
-                        <img src="${thumb}" class="post-thumb" alt="Thumbnail Slide" />
-                        <div class="post-content">
-                            <span class="badge badge-${p.status}">${p.status}</span>
-                            <div class="post-title">${p.topic}</div>
-                            
-                            <div class="progress-box">
-                                <div class="progress-label">
-                                    <span>${stageText}</span>
-                                    <span>${pct}%</span>
+                    return `
+                        <div class="post-card" id="card-${p.id}">
+                            <img src="${thumb}" class="post-thumb" alt="Thumbnail Slide" />
+                            <div class="post-content">
+                                <span class="badge badge-${p.status}">${p.status}</span>
+                                <div class="post-title">${p.topic}</div>
+                                
+                                <div class="progress-box">
+                                    <div class="progress-label">
+                                        <span>${stageText}</span>
+                                        <span>${pct}%</span>
+                                    </div>
+                                    <div class="progress-bar-bg">
+                                        <div class="progress-bar-fill" style="width: ${pct}%;"></div>
+                                    </div>
                                 </div>
-                                <div class="progress-bar-bg">
-                                    <div class="progress-bar-fill" style="width: ${pct}%;"></div>
-                                </div>
-                            </div>
 
-                            <div class="post-date">📅 Criado em: ${createdDate}</div>
-                            <div class="post-actions">
-                                ${p.status === 'scheduled' ? `<button class="btn btn-publish-now" id="pub-btn-${p.id}" onclick="publishNow('${p.id}')">🚀 Publicar Agora</button>` : ''}
-                                <button class="btn btn-outline" onclick="openPreview('${encodeURIComponent(JSON.stringify(mediaList))}', '${encodeURIComponent(p.topic)}')">🔍 Ver 5 Slides</button>
-                                ${p.pdf_url ? `<a href="${p.pdf_url}" target="_blank" class="btn btn-primary">📄 PDF</a>` : ''}
-                                ${p.status === 'posted_linkedin' || p.status === 'published' ? `<a href="https://www.linkedin.com/in/icarosilva-dev" target="_blank" class="btn btn-social">🔗 LinkedIn</a>` : ''}
-                                ${p.instagram_post_id ? `<a href="https://www.instagram.com/__icarofernandes/" target="_blank" class="btn btn-social" style="color: #F472B6; border-color: rgba(236,72,153,0.3);">📸 Instagram</a>` : ''}
-                                <button class="btn btn-danger" onclick="deletePost('${p.id}')">🗑️ Apagar</button>
+                                <div class="post-date">📅 Criado em: ${createdDate}</div>
+                                <div class="post-actions">
+                                    ${p.status === 'scheduled' ? `<button class="btn btn-publish-now" id="pub-btn-${p.id}" onclick="publishNow('${p.id}')">🚀 Publicar Agora</button>` : ''}
+                                    <button class="btn btn-outline" onclick="openPreview('${encodeURIComponent(JSON.stringify(mediaList))}', '${encodeURIComponent(p.topic)}')">🔍 Ver 5 Slides</button>
+                                    ${p.pdf_url ? `<a href="${p.pdf_url}" target="_blank" class="btn btn-primary">📄 PDF</a>` : ''}
+                                    ${p.status === 'posted_linkedin' || p.status === 'published' ? `<a href="https://www.linkedin.com/in/icarosilva-dev" target="_blank" class="btn btn-social">🔗 LinkedIn</a>` : ''}
+                                    ${p.instagram_post_id ? `<a href="https://www.instagram.com/__icarofernandes/" target="_blank" class="btn btn-social" style="color: #F472B6; border-color: rgba(236,72,153,0.3);">📸 Instagram</a>` : ''}
+                                    <button class="btn btn-danger" onclick="deletePost('${p.id}')">🗑️ Apagar</button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                `;
-            }).join('');
+                    `;
+                }).join('');
+            } catch(e) {
+                grid.innerHTML = '<div style="color: #EF4444;">Erro ao carregar dados.</div>';
+            }
         }
 
         async function fetchPromos() {
             const tbody = document.getElementById('promos-body');
             tbody.innerHTML = '<tr><td colspan="5" style="color: #94A3B8;">Carregando ofertas promocionais...</td></tr>';
             try {
-                const res = await fetch('/api/v1/promos');
+                const res = await fetchWithAuth('/api/v1/promos');
                 const promos = await res.json();
 
                 if (promos.length === 0) {
@@ -629,7 +661,7 @@
             const original_url = document.getElementById('promo-url').value;
 
             try {
-                const res = await fetch('/api/v1/promos/broadcast', {
+                const res = await fetchWithAuth('/api/v1/promos/broadcast', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ title, store_name, promo_price, original_price, original_url })
@@ -653,7 +685,7 @@
             }
 
             try {
-                const res = await fetch(`/api/posts/${postId}/publish-now`, { method: 'POST' });
+                const res = await fetchWithAuth(`/api/posts/${postId}/publish-now`, { method: 'POST' });
                 const data = await res.json();
                 if (data.success) {
                     if (btn) btn.innerText = '✅ Publicado!';
@@ -673,7 +705,7 @@
             const tbody = document.getElementById('leads-body');
             tbody.innerHTML = '<tr><td colspan="5" style="color: #94A3B8;">Carregando leads do banco PostgreSQL...</td></tr>';
             try {
-                const res = await fetch('/api/v1/leads');
+                const res = await fetchWithAuth('/api/v1/leads');
                 cachedLeads = await res.json();
 
                 if (cachedLeads.length === 0) {
@@ -700,7 +732,7 @@
                     </tr>
                 `).join('');
             } catch(e) {
-                tbody.innerHTML = '<tr><td colspan="5" style="color: #EF4444;">Erro ao carregar os leads. Servidor em TypeScript rodando na porta 9879.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" style="color: #EF4444;">Erro ao carregar os leads.</td></tr>';
             }
         }
 
@@ -721,28 +753,30 @@
         async function fetchShortLinks() {
             const tbody = document.getElementById('short-links-body');
             tbody.innerHTML = '<tr><td colspan="4" style="color: #94A3B8;">Carregando links...</td></tr>';
-            const res = await fetch('/api/shortlinks');
-            const links = await res.json();
+            try {
+                const res = await fetchWithAuth('/api/shortlinks');
+                const links = await res.json();
 
-            if (links.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4" style="color: #94A3B8;">Nenhum link seguro gerado ainda.</td></tr>';
-                return;
-            }
+                if (links.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="color: #94A3B8;">Nenhum link seguro gerado ainda.</td></tr>';
+                    return;
+                }
 
-            tbody.innerHTML = links.map(l => `
-                <tr>
-                    <td><a href="https://conteudos.icarodev.cloud/r/${l.short_code}" target="_blank" style="color: #60A5FA; font-weight: 600;">https://conteudos.icarodev.cloud/r/${l.short_code}</a></td>
-                    <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #94A3B8;">${l.original_url}</td>
-                    <td style="font-weight: 700; color: #4ADE80;">📊 ${l.clicks} cliques</td>
-                    <td style="color: #64748B;">${new Date(l.created_at).toLocaleString('pt-BR')}</td>
-                </tr>
-            `).join('');
+                tbody.innerHTML = links.map(l => `
+                    <tr>
+                        <td><a href="https://conteudos.icarodev.cloud/r/${l.short_code}" target="_blank" style="color: #60A5FA; font-weight: 600;">https://conteudos.icarodev.cloud/r/${l.short_code}</a></td>
+                        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #94A3B8;">${l.original_url}</td>
+                        <td style="font-weight: 700; color: #4ADE80;">📊 ${l.clicks} cliques</td>
+                        <td style="color: #64748B;">${new Date(l.created_at).toLocaleString('pt-BR')}</td>
+                    </tr>
+                `).join('');
+            } catch(e){}
         }
 
         async function handleShorten(e) {
             e.preventDefault();
             const original_url = document.getElementById('short-url-input').value;
-            const res = await fetch('/api/shorten', {
+            const res = await fetchWithAuth('/api/shorten', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ original_url })
@@ -756,7 +790,7 @@
 
         async function deletePost(postId) {
             if (!confirm('Tem certeza de que deseja apagar permanentemente este conteúdo do banco e do servidor?')) return;
-            const res = await fetch(`/api/posts/${postId}`, { method: 'DELETE' });
+            const res = await fetchWithAuth(`/api/posts/${postId}`, { method: 'DELETE' });
             const data = await res.json();
             if (data.success) {
                 document.getElementById(`card-${postId}`)?.remove();
@@ -819,7 +853,7 @@
 
             statusDiv.innerHTML = '⏳ Enviando solicitação para a esteira do n8n...';
             try {
-                const res = await fetch('/api/generate', {
+                const res = await fetchWithAuth('/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ topic, channel, publish_mode, scheduled_at })
