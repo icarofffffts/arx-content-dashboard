@@ -168,11 +168,14 @@ app.patch('/api/posts/:id/reschedule', async (req, res) => {
       return res.status(400).json({ error: 'A nova data e hora de agendamento são obrigatórias!' });
     }
 
+    // Convert datetime-local (BRT) to UTC timestamp safely with offset -03:00
+    const targetDate = new Date(`${scheduled_at}:00-03:00`);
+
     await pool.query(`
       UPDATE public.content_pipeline 
       SET scheduled_at = $1, status = 'scheduled', updated_at = NOW() 
       WHERE id = $2;
-    `, [new Date(scheduled_at), postId]);
+    `, [targetDate, postId]);
 
     res.json({ success: true, message: 'Agendamento atualizado com sucesso!' });
   } catch (err) {
@@ -205,7 +208,7 @@ app.patch('/api/posts/:id/toggle-pause', async (req, res) => {
   }
 });
 
-// 7. API: Reorganize All Scheduled Posts based on Market Benchmark (Gold Days: Tue, Wed, Thu & Peak Hours)
+// 7. API: Reorganize All Scheduled Posts based on Market Benchmark & Explicit BRT Timezone (America/Sao_Paulo UTC-3)
 app.post('/api/posts/reorganize-schedule', async (req, res) => {
   try {
     const postsRes = await pool.query(`
@@ -219,39 +222,37 @@ app.post('/api/posts/reorganize-schedule', async (req, res) => {
       return res.json({ success: true, message: 'Nenhuma matéria agendada para reorganizar.' });
     }
 
-    // Benchmark Peak Slots based on Sprout Social & Hootsuite study
+    // Benchmark Peak Slots in Horário de Brasília (BRT / UTC-3)
     const BENCHMARK_PEAK_SLOTS = [
-      { hour: 8, minute: 45, label: 'LinkedIn Manhã (Café da Manhã & Tomadores de Decisão)' },
-      { hour: 12, minute: 15, label: 'LinkedIn & Instagram Almoço (Carrosséis & Dados)' },
-      { hour: 17, minute: 15, label: 'Instagram Fim de Tarde (Descompressão do Expediente)' },
-      { hour: 19, minute: 45, label: 'Instagram Noite (Retenção & Engajamento B2C)' }
+      { hour: '08', minute: '45', label: 'LinkedIn Manhã (08h45 BRT)' },
+      { hour: '12', minute: '15', label: 'LinkedIn & Instagram Almoço (12h15 BRT)' },
+      { hour: '17', minute: '15', label: 'Instagram Fim de Tarde (17h15 BRT)' },
+      { hour: '19', minute: '45', label: 'Instagram Noite (19h45 BRT)' }
     ];
 
-    // Priority Days: 2=Tuesday, 3=Wednesday, 4=Thursday (Golden Days)
-    const GOLDEN_DAYS = [2, 3, 4];
+    const GOLDEN_DAYS = [2, 3, 4]; // Tue, Wed, Thu
     
-    let currentDate = new Date();
-    currentDate.setDate(currentDate.getDate() + 1); // Start tomorrow
+    // Start tomorrow in BRT
+    let curr = new Date();
+    curr.setDate(curr.getDate() + 1);
 
-    // Helper: Find next valid business day, preferring Golden Days (Tue, Wed, Thu)
-    function findNextValidDay(d) {
-      const target = new Date(d);
-      // Skip Saturday (6) and Sunday (0)
-      while (target.getDay() === 0 || target.getDay() === 6) {
-        target.setDate(target.getDate() + 1);
-      }
-      return target;
+    // Skip weekends (Saturday=6, Sunday=0)
+    while (curr.getDay() === 0 || curr.getDay() === 6) {
+      curr.setDate(curr.getDate() + 1);
     }
-
-    currentDate = findNextValidDay(currentDate);
 
     let slotIndex = 0;
     const updatedList = [];
 
     for (const post of scheduledPosts) {
       const slot = BENCHMARK_PEAK_SLOTS[slotIndex];
-      const targetDate = new Date(currentDate);
-      targetDate.setHours(slot.hour, slot.minute, 0, 0);
+      const yyyy = curr.getFullYear();
+      const mm = String(curr.getMonth() + 1).padStart(2, '0');
+      const dd = String(curr.getDate()).padStart(2, '0');
+      
+      // Explicit ISO String with BRT offset (-03:00) so PostgreSQL stores exact UTC equivalent
+      const isoStr = `${yyyy}-${mm}-${dd}T${slot.hour}:${slot.minute}:00-03:00`;
+      const targetDate = new Date(isoStr);
 
       await pool.query(`
         UPDATE public.content_pipeline
@@ -264,21 +265,22 @@ app.post('/api/posts/reorganize-schedule', async (req, res) => {
         topic: post.topic,
         scheduled_at: targetDate,
         slot_label: slot.label,
-        is_golden_day: GOLDEN_DAYS.includes(targetDate.getDay())
+        is_golden_day: GOLDEN_DAYS.includes(curr.getDay())
       });
 
       slotIndex++;
       if (slotIndex >= BENCHMARK_PEAK_SLOTS.length) {
         slotIndex = 0;
-        // Advance to next day
-        currentDate.setDate(currentDate.getDate() + 1);
-        currentDate = findNextValidDay(currentDate);
+        curr.setDate(curr.getDate() + 1);
+        while (curr.getDay() === 0 || curr.getDay() === 6) {
+          curr.setDate(curr.getDate() + 1);
+        }
       }
     }
 
     res.json({
       success: true,
-      message: `${scheduledPosts.length} matérias reorganizadas com base no Benchmark de Ouro (Ter-Qui em Horários de Pico do LinkedIn & Instagram)!`,
+      message: `${scheduledPosts.length} matérias reorganizadas com fuso horário ajustado para o Brasil (BRT / UTC-3)!`,
       updated_posts: updatedList
     });
   } catch (err) {
@@ -533,7 +535,7 @@ app.post('/api/generate', async (req, res) => {
       topic, 
       channel: channel || 'all',
       publish_mode: publish_mode || 'now',
-      scheduled_at: scheduled_at || null 
+      scheduled_at: scheduled_at ? `${scheduled_at}:00-03:00` : null 
     });
 
     const reqN8n = http.request({
