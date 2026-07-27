@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arx Content Factory - Painel Master TypeScript</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #090D16;
+            color: #F8FAFC;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        header {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 20px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, #2563EB, #7C3AED);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            font-size: 22px;
+            box-shadow: 0 0 24px rgba(37, 99, 235, 0.5);
+        }
+        .logo-text {
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+        .logo-sub {
+            color: #94A3B8;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .container {
+            max-width: 1440px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 40px 24px;
+            flex: 1;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 18px;
+            margin-bottom: 36px;
+        }
+        .metric-card {
+            background: rgba(30, 41, 59, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            padding: 22px;
+            backdrop-filter: blur(12px);
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+        .metric-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(37, 99, 235, 0.5);
+        }
+        .metric-title {
+            font-size: 13px;
+            color: #94A3B8;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        .metric-value {
+            font-size: 36px;
+            font-weight: 900;
+            background: linear-gradient(135deg, #FFFFFF, #94A3B8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .nav-tabs {
+            display: flex;
+            gap: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            margin-bottom: 32px;
+            padding-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: #94A3B8;
+            font-size: 15px;
+            font-weight: 600;
+            padding: 10px 20px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .tab-btn:hover {
+            color: #F8FAFC;
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .tab-btn.active {
+            color: #FFFFFF;
+            background: #2563EB;
+            box-shadow: 0 0 20px rgba(37, 99, 235, 0.4);
+        }
+        .posts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 26px;
+        }
+        .post-card {
+            background: rgba(20, 30, 48, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 22px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .post-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 16px 36px rgba(0,0,0,0.4);
+            border-color: rgba(37, 99, 235, 0.5);
+        }
+        .post-thumb {
+            width: 100%;
+            height: 220px;
+            background: #0B0F19;
+            object-fit: cover;
+        }
+        .post-content {
+            padding: 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            flex: 1;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            width: fit-content;
+        }
+        .badge-rendering { background: rgba(168, 85, 247, 0.2); color: #C084FC; border: 1px solid rgba(168, 85, 247, 0.4); }
+        .badge-scheduled { background: rgba(234, 179, 8, 0.2); color: #FACC15; border: 1px solid rgba(234, 179, 8, 0.4); }
+        .badge-posted_linkedin { background: rgba(59, 130, 246, 0.2); color: #60A5FA; border: 1px solid rgba(59, 130, 246, 0.4); }
+        .badge-posted_instagram { background: rgba(236, 72, 153, 0.2); color: #F472B6; border: 1px solid rgba(236, 72, 153, 0.4); }
+        .badge-published { background: rgba(34, 197, 94, 0.2); color: #4ADE80; border: 1px solid rgba(34, 197, 94, 0.4); }
+        
+        .progress-box {
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 14px;
+            padding: 12px 14px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            font-weight: 600;
+            color: #94A3B8;
+            margin-bottom: 6px;
+        }
+        .progress-bar-bg {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 9999px;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3B82F6, #8B5CF6, #10B981);
+            border-radius: 9999px;
+            transition: width 0.4s ease;
+        }
+
+        .post-title {
+            font-size: 16px;
+            font-weight: 700;
+            line-height: 1.4;
+            color: #F8FAFC;
+        }
+        .post-date {
+            font-size: 12px;
+            color: #64748B;
+        }
+        .post-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: auto;
+            padding-top: 14px;
+        }
+        .btn {
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            text-decoration: none;
+        }
+        .btn-primary { background: #2563EB; color: white; }
+        .btn-primary:hover { background: #1D4ED8; }
+        .btn-publish-now { background: linear-gradient(135deg, #10B981, #059669); color: white; box-shadow: 0 0 16px rgba(16, 185, 129, 0.3); }
+        .btn-publish-now:hover { transform: scale(1.02); box-shadow: 0 0 24px rgba(16, 185, 129, 0.5); }
+        .btn-outline { background: rgba(255,255,255,0.05); color: #E2E8F0; border: 1px solid rgba(255,255,255,0.1); }
+        .btn-outline:hover { background: rgba(255,255,255,0.12); }
+        .btn-danger { background: rgba(239, 68, 68, 0.2); color: #FCA5A5; border: 1px solid rgba(239, 68, 68, 0.3); }
+        .btn-danger:hover { background: rgba(239, 68, 68, 0.4); color: white; }
+        .btn-social { background: rgba(59, 130, 246, 0.15); color: #93C5FD; border: 1px solid rgba(59, 130, 246, 0.3); }
+        .btn-social:hover { background: rgba(59, 130, 246, 0.3); color: white; }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(10px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+        .modal-body {
+            background: #0F172A;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 24px;
+            max-width: 960px;
+            width: 100%;
+            padding: 32px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .generator-box {
+            background: rgba(20, 30, 48, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 24px;
+            padding: 36px;
+            max-width: 860px;
+            margin: 0 auto;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 22px;
+        }
+        .form-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #E2E8F0;
+        }
+        .form-input {
+            background: #090D16;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 14px 18px;
+            color: white;
+            font-size: 15px;
+            outline: none;
+        }
+        .form-input:focus { border-color: #2563EB; }
+        .links-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .links-table th, .links-table td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            font-size: 14px;
+        }
+        .links-table th { color: #94A3B8; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <div class="logo-icon">A</div>
+            <div>
+                <div class="logo-text">Arx Content Factory</div>
+                <div class="logo-sub">Painel Master TypeScript & Agendamento Inteligente</div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Metric Cards -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-title">Total no Pipeline</div>
+                <div class="metric-value" id="m-total">0</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">🧠 Gerando / Renderizando</div>
+                <div class="metric-value" id="m-rendering" style="color: #C084FC;">0</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">⏳ Aguardando Envio</div>
+                <div class="metric-value" id="m-scheduled" style="color: #FACC15;">0</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">🎯 Leads Capturados (DM)</div>
+                <div class="metric-value" id="m-leads" style="color: #EC4899;">0</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-title">✅ Publicados Total</div>
+                <div class="metric-value" id="m-published" style="color: #4ADE80;">0</div>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="nav-tabs">
+            <button class="tab-btn active" onclick="switchTab('all')">Todos os Posts</button>
+            <button class="tab-btn" onclick="switchTab('scheduled')">⏳ Aguardando Envio</button>
+            <button class="tab-btn" onclick="switchTab('published')">✅ Publicados</button>
+            <button class="tab-btn" onclick="switchTab('leads')">🎯 Leads Capturados por DM (TS Engine)</button>
+            <button class="tab-btn" onclick="switchTab('shortlinks')">🔗 Links Hasheados (Auto-DM)</button>
+            <button class="tab-btn" onclick="switchTab('generate')">⚡ Solicitar Conteúdo</button>
+        </div>
+
+        <!-- Posts Grid View -->
+        <div id="view-posts" class="posts-grid"></div>
+
+        <!-- Leads View -->
+        <div id="view-leads" style="display: none;">
+            <div class="generator-box" style="max-width: 1100px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2 style="font-size: 22px;">🎯 Leads Capturados via Direct / DM (TypeScript Lead Engine)</h2>
+                    <button class="btn btn-primary" onclick="exportLeadsCSV()">📥 Exportar Leads CSV</button>
+                </div>
+                
+                <table class="links-table">
+                    <thead>
+                        <tr>
+                            <th>Instagram User / Handle</th>
+                            <th>Status de Seguidor</th>
+                            <th>Post de Origem</th>
+                            <th>Link Entregue (Hasheado)</th>
+                            <th>Data da Captura</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leads-body">
+                        <tr><td colspan="5" style="color: #94A3B8;">Carregando leads capturados...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Short Links View -->
+        <div id="view-shortlinks" style="display: none;">
+            <div class="generator-box" style="max-width: 1000px;">
+                <h2 style="margin-bottom: 20px; font-size: 22px;">🔗 Gerador & Rastreador de URLs Hasheadas para Auto-DM</h2>
+                <form id="short-form" onsubmit="handleShorten(event)" style="display: flex; gap: 12px; margin-bottom: 24px;">
+                    <input type="url" id="short-url-input" class="form-input" style="flex: 1;" placeholder="Cole a URL original (ex: https://openai.com/...)" required>
+                    <button type="submit" class="btn btn-primary" style="padding: 0 24px;">🔒 Gerar Link Seguro</button>
+                </form>
+
+                <table class="links-table">
+                    <thead>
+                        <tr>
+                            <th>Link Hasheado Seguro (Auto-DM)</th>
+                            <th>URL Original</th>
+                            <th>Cliques Rasteados</th>
+                            <th>Data de Criação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="short-links-body">
+                        <tr><td colspan="4" style="color: #94A3B8;">Carregando links seguros...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Generator On-Demand View with Scheduling -->
+        <div id="view-generate" style="display: none;">
+            <div class="generator-box">
+                <h2 style="margin-bottom: 20px; font-size: 24px;">⚡ Solicitar ou Agendar Conteúdo</h2>
+                <form id="gen-form" onsubmit="handleGenerate(event)">
+                    <div class="form-group">
+                        <label class="form-label">Tema ou Título da Matéria</label>
+                        <input type="text" id="topic-input" class="form-input" placeholder="Ex: Lançamento do Claude Code 3.7 Sonnet CLI" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Canais de Publicação</label>
+                        <select id="channel-input" class="form-input">
+                            <option value="all">Todos os Canais (LinkedIn + Instagram + GitHub)</option>
+                            <option value="linkedin">Apenas LinkedIn</option>
+                            <option value="instagram">Apenas Instagram</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Modo de Publicação</label>
+                        <select id="mode-input" class="form-input" onchange="toggleScheduleDate(this.value)">
+                            <option value="now">⚡ Enviar Agora (Imediato)</option>
+                            <option value="schedule">📅 Agendar para Data/Hora Futura (Dias/Horas)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="schedule-date-group" style="display: none;">
+                        <label class="form-label">Data e Hora Futura de Publicação</label>
+                        <input type="datetime-local" id="schedule-date-input" class="form-input">
+                    </div>
+
+                    <button type="submit" id="gen-btn" class="btn btn-primary" style="width: 100%; padding: 16px; font-size: 16px;">🚀 Iniciar Geração / Agendamento</button>
+                </form>
+                <div id="gen-status" style="margin-top: 20px; font-weight: 600; text-align: center;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Preview -->
+    <div id="modal-preview" class="modal-overlay" onclick="closeModal()">
+        <div class="modal-body" onclick="event.stopPropagation()">
+            <h2 id="modal-title" style="margin-bottom: 20px;"></h2>
+            <div id="modal-slides" style="display: flex; gap: 16px; overflow-x: auto; padding-bottom: 16px;"></div>
+            <button class="btn btn-outline" onclick="closeModal()" style="margin-top: 20px; margin-left: auto;">Fechar</button>
+        </div>
+    </div>
+
+    <script>
+        let currentTab = 'all';
+        let cachedLeads = [];
+
+        function toggleScheduleDate(mode) {
+            const group = document.getElementById('schedule-date-group');
+            group.style.display = mode === 'schedule' ? 'flex' : 'none';
+        }
+
+        async function fetchMetrics() {
+            const res = await fetch('/api/metrics');
+            const data = await res.json();
+            document.getElementById('m-total').innerText = data.total || 0;
+            document.getElementById('m-rendering').innerText = data.rendering || 0;
+            document.getElementById('m-scheduled').innerText = data.scheduled || 0;
+            document.getElementById('m-published').innerText = data.published || 0;
+
+            try {
+                const resLeads = await fetch('/api/v1/leads/stats');
+                const leadsStats = await resLeads.json();
+                document.getElementById('m-leads').innerText = leadsStats.total_leads || 0;
+            } catch(e){}
+        }
+
+        async function fetchPosts(status = 'all') {
+            const grid = document.getElementById('view-posts');
+            grid.innerHTML = '<div style="color: #94A3B8;">Carregando dados seguros do pipeline...</div>';
+            const res = await fetch(`/api/posts?status=${status}`);
+            const posts = await res.json();
+
+            if (posts.length === 0) {
+                grid.innerHTML = '<div style="color: #94A3B8;">Nenhum post encontrado nesta categoria.</div>';
+                return;
+            }
+
+            grid.innerHTML = posts.map(p => {
+                let mediaList = p.instagram_media_paths || p.media_paths || [];
+                if (typeof mediaList === 'string') { try { mediaList = JSON.parse(mediaList); } catch(e){} }
+                const thumb = mediaList[0] || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80';
+                
+                const createdDate = new Date(p.created_at).toLocaleString('pt-BR');
+                const pct = p.progress_percentage || 25;
+                const stageText = pct === 25 ? '🧠 Gerando & Fact-Checking' : pct === 75 ? '📅 Agendado & Seguro' : '🚀 Publicado com Sucesso';
+
+                return `
+                    <div class="post-card" id="card-${p.id}">
+                        <img src="${thumb}" class="post-thumb" alt="Thumbnail Slide" />
+                        <div class="post-content">
+                            <span class="badge badge-${p.status}">${p.status}</span>
+                            <div class="post-title">${p.topic}</div>
+                            
+                            <div class="progress-box">
+                                <div class="progress-label">
+                                    <span>${stageText}</span>
+                                    <span>${pct}%</span>
+                                </div>
+                                <div class="progress-bar-bg">
+                                    <div class="progress-bar-fill" style="width: ${pct}%;"></div>
+                                </div>
+                            </div>
+
+                            <div class="post-date">📅 Criado em: ${createdDate}</div>
+                            <div class="post-actions">
+                                ${p.status === 'scheduled' ? `<button class="btn btn-publish-now" id="pub-btn-${p.id}" onclick="publishNow('${p.id}')">🚀 Publicar Agora</button>` : ''}
+                                <button class="btn btn-outline" onclick="openPreview('${encodeURIComponent(JSON.stringify(mediaList))}', '${encodeURIComponent(p.topic)}')">🔍 Ver 5 Slides</button>
+                                ${p.pdf_url ? `<a href="${p.pdf_url}" target="_blank" class="btn btn-primary">📄 PDF</a>` : ''}
+                                ${p.status === 'posted_linkedin' || p.status === 'published' ? `<a href="https://www.linkedin.com/in/icarosilva-dev" target="_blank" class="btn btn-social">🔗 LinkedIn</a>` : ''}
+                                ${p.instagram_post_id ? `<a href="https://www.instagram.com/__icarofernandes/" target="_blank" class="btn btn-social" style="color: #F472B6; border-color: rgba(236,72,153,0.3);">📸 Instagram</a>` : ''}
+                                <button class="btn btn-danger" onclick="deletePost('${p.id}')">🗑️ Apagar</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function publishNow(postId) {
+            const btn = document.getElementById(`pub-btn-${postId}`);
+            if (btn) {
+                btn.innerText = '⏳ Disparando...';
+                btn.disabled = true;
+            }
+
+            try {
+                const res = await fetch(`/api/posts/${postId}/publish-now`, { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    if (btn) btn.innerText = '✅ Publicado!';
+                    setTimeout(() => {
+                        fetchMetrics();
+                        fetchPosts(currentTab);
+                    }, 1500);
+                } else {
+                    alert('Erro ao publicar: ' + (data.error || 'Tente novamente.'));
+                }
+            } catch(e) {
+                alert('Erro ao enviar o disparo de publicação.');
+            }
+        }
+
+        async function fetchLeads() {
+            const tbody = document.getElementById('leads-body');
+            tbody.innerHTML = '<tr><td colspan="5" style="color: #94A3B8;">Carregando leads do banco PostgreSQL...</td></tr>';
+            try {
+                const res = await fetch('/api/v1/leads');
+                cachedLeads = await res.json();
+
+                if (cachedLeads.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="color: #94A3B8;">Nenhum lead capturado ainda. As pessoas que responderem DMs aparecerão aqui automaticamente!</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = cachedLeads.map(l => `
+                    <tr>
+                        <td style="font-weight: 700; color: #F8FAFC;">
+                            ${l.instagram_handle || l.instagram_user_id}
+                            ${l.full_name ? `<br><span style="font-weight: 400; font-size: 12px; color: #94A3B8;">${l.full_name}</span>` : ''}
+                        </td>
+                        <td>
+                            ${l.is_following 
+                                ? `<span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #4ADE80; border: 1px solid rgba(34, 197, 94, 0.4);">🟢 Seguidor Verificado</span>`
+                                : `<span class="badge" style="background: rgba(234, 179, 8, 0.2); color: #FACC15; border: 1px solid rgba(234, 179, 8, 0.4);">🟡 Aguardando Follower</span>`}
+                        </td>
+                        <td style="max-width: 250px; color: #94A3B8; font-size: 13px;">${l.source_post_topic || 'Direct Geral'}</td>
+                        <td>
+                            ${l.delivered_url ? `<a href="${l.delivered_url}" target="_blank" style="color: #60A5FA; font-weight: 600;">${l.delivered_url}</a>` : '<span style="color: #64748B;">Aguardando liberação</span>'}
+                        </td>
+                        <td style="color: #64748B; font-size: 13px;">${new Date(l.created_at).toLocaleString('pt-BR')}</td>
+                    </tr>
+                `).join('');
+            } catch(e) {
+                tbody.innerHTML = '<tr><td colspan="5" style="color: #EF4444;">Erro ao carregar os leads. Servidor em TypeScript rodando na porta 9879.</td></tr>';
+            }
+        }
+
+        function exportLeadsCSV() {
+            if (cachedLeads.length === 0) return alert('Nenhum lead para exportar!');
+            let csv = 'Instagram Handle,User ID,Nome Completo,Email,Seguidor Verificado,Data Captura\n';
+            cachedLeads.forEach(l => {
+                csv += `"${l.instagram_handle || ''}","${l.instagram_user_id}","${l.full_name || ''}","${l.email || ''}","${l.is_following ? 'SIM' : 'NAO'}","${l.created_at}"\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('href', url);
+            a.setAttribute('download', `leads_icarofernandes_${Date.now()}.csv`);
+            a.click();
+        }
+
+        async function fetchShortLinks() {
+            const tbody = document.getElementById('short-links-body');
+            tbody.innerHTML = '<tr><td colspan="4" style="color: #94A3B8;">Carregando links...</td></tr>';
+            const res = await fetch('/api/shortlinks');
+            const links = await res.json();
+
+            if (links.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="color: #94A3B8;">Nenhum link seguro gerado ainda.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = links.map(l => `
+                <tr>
+                    <td><a href="https://conteudos.icarodev.cloud/r/${l.short_code}" target="_blank" style="color: #60A5FA; font-weight: 600;">https://conteudos.icarodev.cloud/r/${l.short_code}</a></td>
+                    <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #94A3B8;">${l.original_url}</td>
+                    <td style="font-weight: 700; color: #4ADE80;">📊 ${l.clicks} cliques</td>
+                    <td style="color: #64748B;">${new Date(l.created_at).toLocaleString('pt-BR')}</td>
+                </tr>
+            `).join('');
+        }
+
+        async function handleShorten(e) {
+            e.preventDefault();
+            const original_url = document.getElementById('short-url-input').value;
+            const res = await fetch('/api/shorten', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ original_url })
+            });
+            const data = await res.json();
+            if (data.success) {
+                document.getElementById('short-url-input').value = '';
+                fetchShortLinks();
+            }
+        }
+
+        async function deletePost(postId) {
+            if (!confirm('Tem certeza de que deseja apagar permanentemente este conteúdo do banco e do servidor?')) return;
+            const res = await fetch(`/api/posts/${postId}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) {
+                document.getElementById(`card-${postId}`)?.remove();
+                fetchMetrics();
+            }
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+
+            document.getElementById('view-posts').style.display = 'none';
+            document.getElementById('view-leads').style.display = 'none';
+            document.getElementById('view-shortlinks').style.display = 'none';
+            document.getElementById('view-generate').style.display = 'none';
+
+            if (tab === 'generate') {
+                document.getElementById('view-generate').style.display = 'block';
+            } else if (tab === 'leads') {
+                document.getElementById('view-leads').style.display = 'block';
+                fetchLeads();
+            } else if (tab === 'shortlinks') {
+                document.getElementById('view-shortlinks').style.display = 'block';
+                fetchShortLinks();
+            } else {
+                document.getElementById('view-posts').style.display = 'grid';
+                fetchPosts(tab);
+            }
+        }
+
+        function openPreview(mediaJsonStr, topicStr) {
+            const mediaList = JSON.parse(decodeURIComponent(mediaJsonStr));
+            const topic = decodeURIComponent(topicStr);
+
+            document.getElementById('modal-title').innerText = topic;
+            const container = document.getElementById('modal-slides');
+            container.innerHTML = mediaList.map(url => `
+                <img src="${url}" style="height: 380px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1);" />
+            `).join('');
+
+            document.getElementById('modal-preview').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('modal-preview').style.display = 'none';
+        }
+
+        async function handleGenerate(e) {
+            e.preventDefault();
+            const topic = document.getElementById('topic-input').value;
+            const channel = document.getElementById('channel-input').value;
+            const publish_mode = document.getElementById('mode-input').value;
+            const scheduled_at = document.getElementById('schedule-date-input').value;
+            const statusDiv = document.getElementById('gen-status');
+
+            statusDiv.innerHTML = '⏳ Enviando solicitação para a esteira do n8n...';
+            try {
+                const res = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ topic, channel, publish_mode, scheduled_at })
+                });
+                const data = await res.json();
+                statusDiv.innerHTML = '✅ ' + data.message;
+                setTimeout(() => {
+                    fetchMetrics();
+                    switchTab('scheduled');
+                }, 2000);
+            } catch(err) {
+                statusDiv.innerHTML = '❌ Erro ao enviar solicitação.';
+            }
+        }
+
+        // Init
+        fetchMetrics();
+        fetchPosts('all');
+    </script>
+</body>
+</html>
