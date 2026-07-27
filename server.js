@@ -38,14 +38,17 @@ function parseCookies(req) {
   return list;
 }
 
-// 1. Login API Endpoint
+// 1. Login API Endpoint (Case-Insensitive Username & Space Trimming)
 app.post('/api/login', (req, res) => {
-  const { username, password } = req.body;
+  const username = (req.body.username || '').trim().toLowerCase();
+  const password = (req.body.password || '').trim();
+
   if (username === MASTER_USER && password === MASTER_PASS) {
-    res.setHeader('Set-Cookie', `arx_token=${MASTER_TOKEN}; Path=/; HttpOnly; SameSite=Lax; Max-Age=864000`);
+    // Set cookie for browser session
+    res.setHeader('Set-Cookie', `arx_token=${MASTER_TOKEN}; Path=/; SameSite=Lax; Max-Age=864000`);
     return res.json({ success: true, token: MASTER_TOKEN });
   }
-  return res.status(401).json({ success: false, error: 'Usuário ou senha incorretos!' });
+  return res.status(401).json({ success: false, error: 'Usuário ou senha incorretos! Use: admin / arx_secret_2026!' });
 });
 
 // Logout Endpoint
@@ -61,7 +64,10 @@ app.use((req, res, next) => {
   }
 
   const cookies = parseCookies(req);
-  const token = req.headers['authorization']?.replace('Bearer ', '') || req.headers['x-arx-token'] || cookies.arx_token;
+  const token = req.headers['authorization']?.replace('Bearer ', '') || 
+                req.headers['x-arx-token'] || 
+                req.query.token || 
+                cookies.arx_token;
 
   if (token && token === MASTER_TOKEN) {
     return next();
@@ -71,7 +77,7 @@ app.use((req, res, next) => {
     return res.sendFile(path.join(__dirname, 'public', 'login.html'));
   }
 
-  return res.status(401).json({ error: 'Não autorizado. Realize o login primeiro.' });
+  return res.status(401).json({ error: 'Não autorizado. Realize o login em /dashboard/ primeiro.' });
 });
 
 // Serve Static Dashboard Files AFTER Auth Middleware
@@ -131,14 +137,12 @@ app.post('/api/posts/:id/publish-now', async (req, res) => {
   try {
     const postId = req.params.id;
 
-    // Update scheduled_at to NOW() and status to published
     await pool.query(`
       UPDATE public.content_pipeline 
       SET scheduled_at = NOW(), status = 'published', updated_at = NOW() 
       WHERE id = $1;
     `, [postId]);
 
-    // Trigger n8n publisher webhook
     const reqN8n = http.request({
       hostname: '172.18.0.1',
       port: 5678,

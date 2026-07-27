@@ -145,6 +145,25 @@
             box-shadow: 0 10px 25px rgba(37, 99, 235, 0.6);
         }
 
+        .btn-autofill {
+            background: rgba(255, 255, 255, 0.06);
+            color: #94A3B8;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 10px;
+            border: 1px dashed rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+
+        .btn-autofill:hover {
+            color: #F8FAFC;
+            background: rgba(255, 255, 255, 0.12);
+            border-color: #3B82F6;
+        }
+
         .error-alert {
             background: rgba(239, 68, 68, 0.15);
             border: 1px solid rgba(239, 68, 68, 0.3);
@@ -185,10 +204,17 @@
             </div>
 
             <button type="submit" class="btn-login" id="submit-btn">🔐 Entrar no Painel</button>
+            <button type="button" class="btn-autofill" onclick="fillCredentialsAndSubmit()">⚡ Preencher Credenciais & Entrar</button>
         </form>
     </div>
 
     <script>
+        function fillCredentialsAndSubmit() {
+            document.getElementById('username').value = 'admin';
+            document.getElementById('password').value = 'arx_secret_2026!';
+            document.getElementById('login-form').dispatchEvent(new Event('submit', { cancelable: true }));
+        }
+
         async function handleLogin(e) {
             e.preventDefault();
             const username = document.getElementById('username').value.trim();
@@ -209,7 +235,6 @@
 
                 const data = await res.json();
                 if (data.success && data.token) {
-                    // Save token in both localStorage and document.cookie for 100% browser compatibility
                     localStorage.setItem('arx_token', data.token);
                     document.cookie = `arx_token=${data.token}; path=/; max-age=864000; SameSite=Lax`;
                     window.location.href = '/dashboard/';
